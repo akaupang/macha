@@ -3,7 +3,7 @@ Please note that this an early incarnation, which may or may not be suitable for
 
 It is recommended to set an alias for the script for convenient usage, e.g. in your .bashrc:
 
-\# Make sure the charmm binary is in the PATH
+\# Make sure that the charmm binary is in the PATH
 
 export PATH="/path/to/charmm/bin:$PATH"
 
