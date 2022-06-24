@@ -1,62 +1,49 @@
 #!/bin/bash
-# For paste toggle in vim
-# set pastetoggle=<F2>
-
+# Manual Charmm
 runmenu () {
   echo ""
-  echo "Manual CHARMM System Setup"
+  echo "Manual Launch Control for CHARMM-GUI Scripts"
   echo ""
-  echo "1: Copy custom system files to current folder (reset)"
-  echo "2: Step 1   CHARMM-GUI PDB Reader (modified)"
-  echo "3: Step 2.1 CHARMM-GUI Waterbox"
-  echo "4: Step 2.2 CHARMM-GUI Ions"
-  echo "5: Step 2   CHARMM-GUI Solvator"
-  echo "6: Step 3   CHARMM-GUI PBC Setup"
-  echo "7: Step 3.1 Convert CHARMM system to an OpenMM system"
-  echo "8: Step 3.2 Copy CG OpenMM CHARMM interpreter python scripts to openmm/"
-  echo "9: Step 3.3 Set system base name"
-  echo "            Set simulation length (and timestep)"
-  echo "            Create replicas"
+  echo "Key"
+  echo " 1 : Step 1   PDB Reader (modified)"
+  echo " 2 : Step 2.1 Waterbox"
+  echo " 3 : Step 2.2 Ions"
+  echo " 4 : Step 2   Solvator"
+  echo " 5 : Step 3   PBC Setup"
+  echo " 6 : Step 3.1 Convert CHARMM system to an OpenMM system"
+  echo " 7 : Step 3.2 Copy CG OpenMM CHARMM interpreter python scripts to openmm/"
+  echo " 8 : Step 3.3 Set system base name"
+  echo "              Set simulation length (and timestep)"
+  echo "              Create replicas"
+  echo " 9 : Copy custom system files to current folder (reset)"
   echo ""
-  echo "Press q to quit"
-  read -n 1 -p "Process options: " "menuoption"
+  echo " q : Quit"
+  echo ""
+  read -n 1 -p "Process options (1 - 9, q): " "menuoption"
 
 ###############################################################################
 
   if [ "$menuoption" = "1" ]; then
     echo ""
-    echo "Are you sure? (if yes, press 1)"
-    read surefire
-    if [ "$surefire" == "1" ]; then
-      rsync -rtp --exclude '.git' /scratch/data/asmund/repos/mod_systems/* . &&\
-      echo "Finished copying" && runmenu
-    else
-      runmenu
-    fi
-
-###############################################################################
-
-  elif [ "$menuoption" = "2" ]; then
-    echo ""
     charmm < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out && sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
     runmenu
-  elif [ "$menuoption" = "3" ]; then
+  elif [ "$menuoption" = "2" ]; then
     echo ""
     charmm < step2.1_waterbox.inp > step2.1_waterbox.out && tail -n 6 step2.1_waterbox.out && runmenu
 
-  elif [ "$menuoption" = "4" ]; then
+  elif [ "$menuoption" = "3" ]; then
     echo ""
     charmm < step2.2_ions.inp > step2.2_ions.out && tail -n 6 step2.2_ions.out && runmenu
 
-  elif [ "$menuoption" = "5" ]; then
+  elif [ "$menuoption" = "4" ]; then
     echo ""
     charmm < step2_solvator.inp > step2_solvator.out && tail -n 6 step2_solvator.out && runmenu
 
-  elif [ "$menuoption" = "6" ]; then
+  elif [ "$menuoption" = "5" ]; then
     echo ""
     charmm < step3_pbcsetup.inp > step3_pbcsetup.out && tail -n 6 step3_pbcsetup.out && runmenu
 
-  elif [ "$menuoption" = "7" ]; then
+  elif [ "$menuoption" = "6" ]; then
     echo ""
 
     # Handle an eventual old openmm folder, to allow backup and continued modification (rerun of step3.1). Also handle the case of a new folder (files were recopied, system reset).
@@ -233,7 +220,7 @@ runmenu () {
 
 ###############################################################################
 
-  elif [ "$menuoption" = "8" ]; then
+  elif [ "$menuoption" = "7" ]; then
     echo ""
 
     # CHARMM-GUI CHARMM Interpreter Scripts for OpenMM
@@ -295,7 +282,7 @@ runmenu () {
     runmenu
 ###############################################################################
 
-  elif [ "$menuoption" = "9" ]; then
+  elif [ "$menuoption" = "8" ]; then
     echo ""
 
     # Simple SLURM Script based on CG OpenMM scripts
@@ -462,6 +449,20 @@ runmenu () {
     done
 
     runmenu
+
+###############################################################################
+
+  elif [ "$menuoption" = "9" ]; then
+    echo ""
+    echo "Are you sure? (if yes, press 1)"
+    read surefire
+    if [ "$surefire" == "1" ]; then
+      rsync -rtp --exclude '.git' /scratch/data/asmund/repos/mod_systems/* . &&\
+      echo "Finished copying" && runmenu
+    else
+      runmenu
+    fi
+
 ###############################################################################
   elif [ "$menuoption" = "q" ];then
     echo " <- Goodbye"
