@@ -1,4 +1,132 @@
 #!/bin/bash
+insert_modlines () {
+  if [ -f "${1}.inp.premod" ]; then
+    cp "${1}.inp.premod" "${1}.inp"
+  fi
+  cp "${1}.inp" "${1}.inp.premod" &&\
+  sed -i "s/${2}/${3}/g" "${1}.inp"
+  if [ ! -z "${4}" ]; then
+    if [ ! -z "${5}" ]; then
+      sed -i "s/${4}/${5}/g" "${1}.inp"
+      if [ ! -z "${6}" ]; then
+        if [ ! -z "${7}" ]; then
+          sed -i "s/${6}/${7}/g" "${1}.inp"
+          if [ ! -z "${8}" ]; then
+            if [ ! -z "${9}" ]; then
+              sed -i "s/${8}/${9}/g" "${1}.inp"
+            fi
+          fi
+        fi
+      fi
+    fi
+  fi
+}
+
+runsubmenu () {
+  echo ""
+  echo "Advanced Options"
+  echo ""
+  echo "Key"
+  echo " 1 : Modify input files with MBL customization hooks"
+  echo " 2 : Option2"
+  echo " 3 : Option3"
+  echo " 4 : Option4"
+  echo ""
+  echo " r : Return to main menu"
+  echo " q : Quit"
+  echo ""
+  read -n 1 -p "Process options (1 - 4, r, q): " "submenuoption"
+################################################################################
+
+  if [ "$submenuoption" = "1" ]; then
+    echo ""
+#   echo ""
+#   echo "Are you sure? (if yes, press 1)"
+#   read surefire
+#   if [ "$surefire" == "9" ]; then
+#     rsync -rtp --exclude '.git' /scratch/data/asmund/repos/mod_systems/* . &&\
+#     echo "Finished copying" && runmenu
+#   else
+#     runmenu
+#   fi
+
+    # REPLACEMENT FOR LOCATION 1 / MODSTAGE 1 - TOPPAR BEFORE SYSTEM OBJECTS
+    m1in="stream toppar.str\n"
+    m1in+="\n"
+    m1in+="!-------------------------------------------------------------------------------\n"
+    m1in+="! SYSTEM MODIFICATIONS\n"
+    m1in+="set modstage 1\n"
+    m1in+="stream toppar\/toppar_mbl_system_modifications.str\n"
+    m1in+="!-------------------------------------------------------------------------------"
+    
+    # REPLACEMENT FOR LOCATION 2 / MODSTAGE 2 - ACTIONS AFTER SYSTEM OBJECTS
+    m2in="!-------------------------------------------------------------------------------\n"
+    m2in+="! SYSTEM MODIFICATIONS\n"
+    m2in+="set modstage 2\n"
+    m2in+="stream toppar\/toppar_mbl_system_modifications.str\n"
+    m2in+="!-------------------------------------------------------------------------------\n"
+    m2in+="\n"
+    m2in+="! Read WATA"
+
+    # REPLACEMENT FOR LOCATION 3 / MODSTAGE 3 - HBUILD CONTROL
+    m3in="!-------------------------------------------------------------------------------\n"
+    m3in+="! SYSTEM MODIFICATIONS\n"
+    m3in+="set modstage 3\n"
+    m3in+="stream toppar\/toppar_mbl_system_modifications.str\n"
+    m3in+="!-------------------------------------------------------------------------------"
+
+    # REPLACEMENT FOR LOCATION 4 / MODSTAGE 4 - PRINT USED PARAMETERS
+    m4in="!-------------------------------------------------------------------------------\n"
+    m4in+="! SYSTEM MODIFICATIONS\n"
+    m4in+="set modstage 4\n"
+    m4in+="stream toppar\/toppar_mbl_system_modifications.str\n"
+    m4in+="!-------------------------------------------------------------------------------\n"
+    m4in+="\n"
+    m4in+="open write unit 10 card name step1_pdbreader.psf"
+
+    # if [ -f step1_pdbreader.inp.premod ]; then
+    #   cp step1_pdbreader.inp.premod step1_pdbreader.inp
+    # fi
+    # cp step1_pdbreader.inp step1_pdbreader.inp.premod &&\
+    # sed -i "s/stream\ toppar.str/${m1in}/g" step1_pdbreader.inp
+   
+    insert_modlines "step1_pdbreader"\
+                    "stream\ toppar.str" "${m1in}"\
+                    "! Read WATA" "${m2in}"\
+                    "hbuild sele hydr end" "${m3in}"\
+                    "open write unit 10 card name step1_pdbreader.psf" "${m4in}"
+
+    insert_modlines "step2.1_waterbox" "stream\ toppar.str" "${m1in}"
+    insert_modlines "step2.2_ions" "stream\ toppar.str" "${m1in}"
+    insert_modlines "step2_solvator" "stream\ toppar.str" "${m1in}"
+    insert_modlines "step3_pbcsetup" "stream\ toppar.str" "${m1in}"
+    insert_modlines "step4_equilibration" "stream\ toppar.str" "${m1in}"
+    insert_modlines "step5_production" "stream\ toppar.str" "${m1in}"
+
+
+
+    echo ""
+    echo "System modification hooks added to input files"
+    echo ""
+    runsubmenu
+
+
+elif [ "$submenuoption" = "r" ];then
+    runmenu
+
+  elif [ "$submenuoption" = "q" ];then
+    echo " <- Goodbye"
+    exit 0       
+
+  else
+    timeout 2s echo " <- Unrecognized option. Press any key."
+    #read -n 1 k <&1
+    runsubmenu
+  fi
+
+
+}
+
 # Manual Charmm
 runmenu () {
   echo ""
@@ -10,12 +138,15 @@ runmenu () {
   echo " 3 : Step 2.2 Ions"
   echo " 4 : Step 2   Solvator"
   echo " 5 : Step 3   PBC Setup"
+  echo ""
+  echo " c : Run Steps 1-3 consecutively"
+  echo ""
   echo " 6 : Step 3.1 Convert CHARMM system to an OpenMM system"
   echo " 7 : Step 3.2 Copy CG OpenMM CHARMM interpreter python scripts to openmm/"
   echo " 8 : Step 3.3 Set system base name"
   echo "              Set simulation length (and timestep)"
   echo "              Create replicas"
-  echo " 9 : Copy custom system files to current folder (reset)"
+  echo " 9 : Advanced options"
   echo ""
   echo " q : Quit"
   echo ""
@@ -25,7 +156,9 @@ runmenu () {
 
   if [ "$menuoption" = "1" ]; then
     echo ""
-    charmm < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out && sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
+    charmm < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out
+    sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
+    sed -n '/START_HBUILD/,/END_HBUILD/p' step1_pdbreader.out > step1_hbuild_log.dat
     runmenu
   elif [ "$menuoption" = "2" ]; then
     echo ""
@@ -42,6 +175,26 @@ runmenu () {
   elif [ "$menuoption" = "5" ]; then
     echo ""
     charmm < step3_pbcsetup.inp > step3_pbcsetup.out && tail -n 6 step3_pbcsetup.out && runmenu
+
+  elif [ "$menuoption" = "c" ]; then
+    echo ""
+    echo "Step 1 PDB Reader:"
+    charmm < step1_pdbreader.inp > step1_pdbreader.out &&\
+      tail -n 6 step1_pdbreader.out &&\
+    echo "Step 2.1 Waterbox:" &&\
+    charmm < step2.1_waterbox.inp > step2.1_waterbox.out &&\
+      tail -n 6 step2.1_waterbox.out &&\
+    echo "Step 2.2 Ions:" &&\
+    charmm < step2.2_ions.inp > step2.2_ions.out &&\
+      tail -n 6 step2.2_ions.out &&\
+    echo "Step 2 Solvator" &&\
+    charmm < step2_solvator.inp > step2_solvator.out &&\
+      tail -n 6 step2_solvator.out &&\
+    echo "Step 3 PBC Setup" &&\
+    charmm < step3_pbcsetup.inp > step3_pbcsetup.out &&\
+      tail -n 6 step3_pbcsetup.out &&\
+    sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
+    runmenu
 
   elif [ "$menuoption" = "6" ]; then
     echo ""
@@ -453,15 +606,7 @@ runmenu () {
 ###############################################################################
 
   elif [ "$menuoption" = "9" ]; then
-    echo ""
-    echo "Are you sure? (if yes, press 1)"
-    read surefire
-    if [ "$surefire" == "1" ]; then
-      rsync -rtp --exclude '.git' /scratch/data/asmund/repos/mod_systems/* . &&\
-      echo "Finished copying" && runmenu
-    else
-      runmenu
-    fi
+    runsubmenu
 
 ###############################################################################
   elif [ "$menuoption" = "q" ];then
