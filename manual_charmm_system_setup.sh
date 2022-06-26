@@ -103,11 +103,8 @@ runsubmenu () {
     insert_modlines "step4_equilibration" "stream\ toppar.str" "${m1in}"
     insert_modlines "step5_production" "stream\ toppar.str" "${m1in}"
 
-
-
     echo ""
     echo "System modification hooks added to input files"
-    echo ""
     runsubmenu
 
 
@@ -123,8 +120,6 @@ elif [ "$submenuoption" = "r" ];then
     #read -n 1 k <&1
     runsubmenu
   fi
-
-
 }
 
 # Manual Charmm
@@ -385,7 +380,7 @@ runmenu () {
     omm_rewrap="omm_rewrap.py"
     omm_barostat="omm_barostat.py"
 
-    cgommpyloc_repo="/scratch/data/asmund/repos/mod_systems/new_openmm"
+    cgommpyloc_repo="/scratch/data/asmund/proteins/mbls/mod_systems/new_openmm"
     cgommpyloc_repo=$(realpath "$cgommpyloc_repo")
 
     echo "The default location of the CG OpenMM CHARMM interpreter scripts is:"
