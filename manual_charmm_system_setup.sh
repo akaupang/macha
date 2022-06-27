@@ -1,34 +1,12 @@
 #!/bin/bash
-insert_modlines () {
-  if [ -f "${1}.inp.premod" ]; then
-    cp "${1}.inp.premod" "${1}.inp"
-  fi
-  cp "${1}.inp" "${1}.inp.premod" &&\
-  sed -i "s/${2}/${3}/g" "${1}.inp"
-  if [ ! -z "${4}" ]; then
-    if [ ! -z "${5}" ]; then
-      sed -i "s/${4}/${5}/g" "${1}.inp"
-      if [ ! -z "${6}" ]; then
-        if [ ! -z "${7}" ]; then
-          sed -i "s/${6}/${7}/g" "${1}.inp"
-          if [ ! -z "${8}" ]; then
-            if [ ! -z "${9}" ]; then
-              sed -i "s/${8}/${9}/g" "${1}.inp"
-            fi
-          fi
-        fi
-      fi
-    fi
-  fi
-}
 
 runsubmenu () {
   echo ""
   echo "Advanced Options"
   echo ""
   echo "Key"
-  echo " 1 : Modify input files with MBL customization hooks"
-  echo " 2 : Option2"
+  echo " 1 : Modify input files with MBL customization hooks (Python 3.9)"
+  echo " 2 : Add ligand toppar to toppar.str"
   echo " 3 : Option3"
   echo " 4 : Option4"
   echo ""
@@ -40,75 +18,30 @@ runsubmenu () {
 
   if [ "$submenuoption" = "1" ]; then
     echo ""
-#   echo ""
-#   echo "Are you sure? (if yes, press 1)"
-#   read surefire
-#   if [ "$surefire" == "9" ]; then
-#     rsync -rtp --exclude '.git' /scratch/data/asmund/repos/mod_systems/* . &&\
-#     echo "Finished copying" && runmenu
-#   else
-#     runmenu
-#   fi
-
-    # REPLACEMENT FOR LOCATION 1 / MODSTAGE 1 - TOPPAR BEFORE SYSTEM OBJECTS
-    m1in="stream toppar.str\n"
-    m1in+="\n"
-    m1in+="!-------------------------------------------------------------------------------\n"
-    m1in+="! SYSTEM MODIFICATIONS\n"
-    m1in+="set modstage 1\n"
-    m1in+="stream toppar\/toppar_mbl_system_modifications.str\n"
-    m1in+="!-------------------------------------------------------------------------------"
+    python3 -u charmm_mbl_system_modification_variables.py $PWD
     
-    # REPLACEMENT FOR LOCATION 2 / MODSTAGE 2 - ACTIONS AFTER SYSTEM OBJECTS
-    m2in="!-------------------------------------------------------------------------------\n"
-    m2in+="! SYSTEM MODIFICATIONS\n"
-    m2in+="set modstage 2\n"
-    m2in+="stream toppar\/toppar_mbl_system_modifications.str\n"
-    m2in+="!-------------------------------------------------------------------------------\n"
-    m2in+="\n"
-    m2in+="! Read WATA"
-
-    # REPLACEMENT FOR LOCATION 3 / MODSTAGE 3 - HBUILD CONTROL
-    m3in="!-------------------------------------------------------------------------------\n"
-    m3in+="! SYSTEM MODIFICATIONS\n"
-    m3in+="set modstage 3\n"
-    m3in+="stream toppar\/toppar_mbl_system_modifications.str\n"
-    m3in+="!-------------------------------------------------------------------------------"
-
-    # REPLACEMENT FOR LOCATION 4 / MODSTAGE 4 - PRINT USED PARAMETERS
-    m4in="!-------------------------------------------------------------------------------\n"
-    m4in+="! SYSTEM MODIFICATIONS\n"
-    m4in+="set modstage 4\n"
-    m4in+="stream toppar\/toppar_mbl_system_modifications.str\n"
-    m4in+="!-------------------------------------------------------------------------------\n"
-    m4in+="\n"
-    m4in+="open write unit 10 card name step1_pdbreader.psf"
-
-    # if [ -f step1_pdbreader.inp.premod ]; then
-    #   cp step1_pdbreader.inp.premod step1_pdbreader.inp
-    # fi
-    # cp step1_pdbreader.inp step1_pdbreader.inp.premod &&\
-    # sed -i "s/stream\ toppar.str/${m1in}/g" step1_pdbreader.inp
-   
-    insert_modlines "step1_pdbreader"\
-                    "stream\ toppar.str" "${m1in}"\
-                    "! Read WATA" "${m2in}"\
-                    "hbuild sele hydr end" "${m3in}"\
-                    "open write unit 10 card name step1_pdbreader.psf" "${m4in}"
-
-    insert_modlines "step2.1_waterbox" "stream\ toppar.str" "${m1in}"
-    insert_modlines "step2.2_ions" "stream\ toppar.str" "${m1in}"
-    insert_modlines "step2_solvator" "stream\ toppar.str" "${m1in}"
-    insert_modlines "step3_pbcsetup" "stream\ toppar.str" "${m1in}"
-    insert_modlines "step4_equilibration" "stream\ toppar.str" "${m1in}"
-    insert_modlines "step5_production" "stream\ toppar.str" "${m1in}"
-
-    echo ""
     echo "System modification hooks added to input files"
     runsubmenu
 
+  elif [ "$submenuoption" = "2" ];then
+    echo ""
+    echo "Input ligand name=ligand toppar directory name"
+    read ligname
+    ligtopparblock="\n"
+    ligtopparblock+="! Ligand topology and parameter files\n"
+    ligtopparblock+="open read card unit 10 name ${ligname}/${ligname}.rtf\n"
+    ligtopparblock+="read  rtf card unit 10 append\n"
+    ligtopparblock+="\n"
+    ligtopparblock+="open read card unit 20 name ${ligname}/${ligname}.prm\n"
+    ligtopparblock+="read para flex card unit 20 append\n"
+    ligtopparblock+="\n"
 
-elif [ "$submenuoption" = "r" ];then
+    printf "%b" "$ligtopparblock" >> "toppar.str"
+
+    echo "Added ligand topology/parameter files to the toppar.str"
+    runsubmenu
+
+  elif [ "$submenuoption" = "r" ];then
     runmenu
 
   elif [ "$submenuoption" = "q" ];then
