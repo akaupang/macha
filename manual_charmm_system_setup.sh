@@ -312,19 +312,22 @@ runmenu () {
     omm_vfswitch="omm_vfswitch.py"
     omm_rewrap="omm_rewrap.py"
     omm_barostat="omm_barostat.py"
+    omm_step4_eq="step4_equilibration.inp"
+    omm_step5_prod="step5_production.inp"
 
-    cgommpyloc_repo="/scratch/data/asmund/proteins/mbls/mod_systems/new_openmm"
-    cgommpyloc_repo=$(realpath "$cgommpyloc_repo")
+    #cgommpyloc_def="/scratch/data/asmund/proteins/mbls/mod_systems/new_openmm"
+    cgommpyloc_def="$PWD/prev_openmm_1"
+    cgommpyloc_def=$(realpath "$cgommpyloc_def")
 
     echo "The default location of the CG OpenMM CHARMM interpreter scripts is:"
-    echo "$cgommpyloc_repo"
+    echo "$cgommpyloc_def"
     echo "Press Enter to copy scripts from this location."
     echo "Press d     to provide your own directory."
     echo "Existing scripts in the destination openmm/ will not be overwritten."
     read -r -s -n 1 key
 
     if [ "$key" = "" ]; then
-      cgommpyloc=$cgommpyloc_repo
+      cgommpyloc=$cgommpyloc_def
     elif [ "$key" = "d" ]; then
       echo "Enter new directory"
       read cgommpyloc
@@ -343,7 +346,9 @@ runmenu () {
                         "$omm_restraints"
                         "$omm_vfswitch"
                         "$omm_rewrap"
-                        "$omm_barostat")
+                        "$omm_barostat"
+                        "$omm_step4_eq"
+                        "$omm_step5_prod")
 
     #arraylength=${#array[@]}
     #for (( i=0; i<${arraylength}; i++ ));
@@ -352,7 +357,7 @@ runmenu () {
     do
       if [ ! -f openmm/"$scr" ]; then
         if [ -f "$cgommpyloc"/"$scr" ]; then
-          cp "$cgommpyloc"/"$scr" openmm/
+          cp "$cgommpyloc"/"$scr" openmm/ &&\
           echo "Copied "$scr"" 
         else
           echo "File "$cgommpyloc"/"$scr" not found!"
