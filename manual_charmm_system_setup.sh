@@ -1,12 +1,48 @@
 #!/bin/bash
 
+# System variables
+# CHARMM binary
+# NOTE - if a path to the CHARMM binary
+# Check if "charmm" is in the PATH
+charmm_bin_man=""
+
+if [ "${charmm_bin_man}" = "" ];then
+  if ! command -v charmm &> /dev/null; then
+    echo "The CHARMM binary must be available to this tool, either through"
+    echo "the $PATH, or by setting its location in the script."
+    exit
+  else
+    charmm_bin="charmm"
+  fi
+else
+  charmm_bin=${charmm_bin_man}
+fi
+
+# MBL system modification script directory
+mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
+
+# Location of CHARMM-GUI-provided OpenMM Python scripts
+# Default is the directory created upon creation of a modified OpenMM system,
+# that is the original "openmm" directory
+cgommpyloc_def="$PWD/prev_openmm_1"
+
+# The name of the internally generated step 3.1 input file is
+ommcname="step3.1_omm"
+
+# Functions
+# Execute CHARMM
+charmm_exec () {
+  ${charmm_bin} "$@"
+}
+
+# Advanced submenu
 runsubmenu () {
   echo ""
   echo "Advanced Options"
   echo ""
   echo "Key"
-  echo " 1 : Modify input files with MBL customization hooks (Python 3.9)"
-  echo " 2 : Add ligand toppar to toppar.str"
+  echo " 1 : Add ligand toppar to toppar.str"
+  echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
   echo " 3 : Option3"
   echo " 4 : Option4"
   echo ""
@@ -17,13 +53,6 @@ runsubmenu () {
 ################################################################################
 
   if [ "$submenuoption" = "1" ]; then
-    echo ""
-    python3 -u charmm_mbl_system_modification_variables.py $PWD
-    
-    echo "System modification hooks added to input files"
-    runsubmenu
-
-  elif [ "$submenuoption" = "2" ];then
     echo ""
     echo "Input ligand name=ligand toppar directory name"
     read ligname
@@ -41,6 +70,21 @@ runsubmenu () {
     echo "Added ligand topology/parameter files to the toppar.str"
     runsubmenu
 
+elif [ "$submenuoption" = "2" ];then
+    mblpyloc_def=$(realpath "$mblpyloc_def")
+    echo ""
+    echo "Looking for MBL system modification scripts in:"
+    echo ${mblpyloc_def}
+    if [[ -f "${mblpyloc_def}/charmm_mbl_system_modification_variables.py" && -f "${mblpyloc_def}/charmm_mbl_system_modifications.py" ]];then
+      python3 -u ${mblpyloc_def}/charmm_mbl_system_modification_variables.py $PWD &&\
+      echo "System modification hooks added to input files"
+    else
+      echo "MBL system modification scripts not found! Please provide a valid location and set this in the macha script file."
+    fi
+
+    runsubmenu
+
+
   elif [ "$submenuoption" = "r" ];then
     runmenu
 
@@ -55,12 +99,14 @@ runsubmenu () {
   fi
 }
 
-# Manual Charmm
+# Main menu
 runmenu () {
   echo ""
   echo "Manual Launch Control for CHARMM-GUI Scripts"
   echo ""
   echo "Key"
+  echo " a : Advanced pre-run options"
+  echo ""
   echo " 1 : Step 1   PDB Reader (modified)"
   echo " 2 : Step 2.1 Waterbox"
   echo " 3 : Step 2.2 Ions"
@@ -74,7 +120,6 @@ runmenu () {
   echo " 8 : Step 3.3 Set system base name"
   echo "              Set simulation length (and timestep)"
   echo "              Create replicas"
-  echo " 9 : Advanced options"
   echo ""
   echo " q : Quit"
   echo ""
@@ -84,50 +129,50 @@ runmenu () {
 
   if [ "$menuoption" = "1" ]; then
     echo ""
-    charmm < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out
+    charmm_exec < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out
     sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
     sed -n '/START_HBUILD/,/END_HBUILD/p' step1_pdbreader.out > step1_hbuild_log.dat
     runmenu
   elif [ "$menuoption" = "2" ]; then
     echo ""
-    charmm < step2.1_waterbox.inp > step2.1_waterbox.out && tail -n 6 step2.1_waterbox.out && runmenu
+    charmm_exec < step2.1_waterbox.inp > step2.1_waterbox.out && tail -n 6 step2.1_waterbox.out && runmenu
 
   elif [ "$menuoption" = "3" ]; then
     echo ""
-    charmm < step2.2_ions.inp > step2.2_ions.out && tail -n 6 step2.2_ions.out && runmenu
+    charmm_exec < step2.2_ions.inp > step2.2_ions.out && tail -n 6 step2.2_ions.out && runmenu
 
   elif [ "$menuoption" = "4" ]; then
     echo ""
-    charmm < step2_solvator.inp > step2_solvator.out && tail -n 6 step2_solvator.out && runmenu
+    charmm_exec < step2_solvator.inp > step2_solvator.out && tail -n 6 step2_solvator.out && runmenu
 
   elif [ "$menuoption" = "5" ]; then
     echo ""
-    charmm < step3_pbcsetup.inp > step3_pbcsetup.out && tail -n 6 step3_pbcsetup.out && runmenu
+    charmm_exec < step3_pbcsetup.inp > step3_pbcsetup.out && tail -n 6 step3_pbcsetup.out && runmenu
 
   elif [ "$menuoption" = "c" ]; then
     echo ""
     echo "Step 1 PDB Reader:"
-    charmm < step1_pdbreader.inp > step1_pdbreader.out &&\
+    charmm_exec < step1_pdbreader.inp > step1_pdbreader.out &&\
       tail -n 6 step1_pdbreader.out &&\
     echo "Step 2.1 Waterbox:" &&\
-    charmm < step2.1_waterbox.inp > step2.1_waterbox.out &&\
+    charmm_exec < step2.1_waterbox.inp > step2.1_waterbox.out &&\
       tail -n 6 step2.1_waterbox.out &&\
     echo "Step 2.2 Ions:" &&\
-    charmm < step2.2_ions.inp > step2.2_ions.out &&\
+    charmm_exec < step2.2_ions.inp > step2.2_ions.out &&\
       tail -n 6 step2.2_ions.out &&\
     echo "Step 2 Solvator" &&\
-    charmm < step2_solvator.inp > step2_solvator.out &&\
+    charmm_exec < step2_solvator.inp > step2_solvator.out &&\
       tail -n 6 step2_solvator.out &&\
     echo "Step 3 PBC Setup" &&\
-    charmm < step3_pbcsetup.inp > step3_pbcsetup.out &&\
+    charmm_exec < step3_pbcsetup.inp > step3_pbcsetup.out &&\
       tail -n 6 step3_pbcsetup.out &&\
     sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
     runmenu
 
   elif [ "$menuoption" = "6" ]; then
     echo ""
-
-    # Handle an eventual old openmm folder, to allow backup and continued modification (rerun of step3.1). Also handle the case of a new folder (files were recopied, system reset).
+    echo ""
+    # Handle an (eventual) existing openmm folder, to allow backup and continued modification (rerun of step3.1). Also handle the case of a new folder (files were recopied, system reset). NOTE may be moot
     if [ -d "openmm" ]; then
       echo "Found existing OpenMM directory (openmm/)"
       
@@ -140,7 +185,7 @@ runmenu () {
       mv openmm/* "$podir/"
       echo "Backed it up as $podir/"
 
-      # Check if a template directory is present
+      # Check if a template directory is present # Consider if this option is moot!
       if [ -d "new_openmm" ]; then
         `/bin/rm -rf openmm/`
         mv new_openmm/ openmm/
@@ -149,10 +194,13 @@ runmenu () {
       else
         mkdir -p openmm/
         mkdir -p openmm/restraints/
+        # Transformato styled openMM folder
+        mkdir -p openmm/toppar/
+        cp -r toppar/* openmm/toppar/
         echo "Created a new OpenMM directory for the current system"
       fi
     else
-      if [ -d new_openmm ]; then
+      if [ -d "new_openmm" ]; then
         mv new_openmm/ openmm/
         echo "Created an OpenMM directory (openmm/) from template files"
       else
@@ -162,6 +210,7 @@ runmenu () {
       mkdir -p openmm/restraints/
     fi
 
+    # TOPPAR STREAM AND ADDED TOPOLOGIES/PARAMETERS
     # Transform the CHARMM-GUI toppar.str to an OpenMM toppar.str
     # at least with the formers current formatting
     # The following sed command searches for anything + "toppar/" 
@@ -169,11 +218,33 @@ runmenu () {
     # the search parameter, which is now; "line ends with rtf/prm/str".
     `grep -v "!" toppar.str > toppar_tmp.str`
 
-    `sed 's/.* //' toppar_tmp.str | sed -n -e 's/^.*\(rtf$\|prm$\|str$\)/..\/\0/p' > openmm/toppar.str` &&\
+    #`sed 's/.* //' toppar_tmp.str | sed -n -e 's/^.*\(rtf$\|prm$\|str$\)/..\/\0/p' > openmm/toppar.str` &&\
+    # Transformato styled toppar.str
+    `sed 's/.* //' toppar_tmp.str | sed -n -e 's/^.*\(rtf$\|prm$\|str$\)/\0/p' > openmm/toppar.str` &&\
     `/bin/rm -f toppar_tmp.str` &&\
-    echo "Converted toppar.str (CHARMM format) to openmm/toppar.str (OpenMM format)"
+    echo "Converted toppar.str (CHARMM format) to openmm/toppar.str (OpenMM/Transformato format)"
+    # Find lines in openmm/toppar.str that do not contain the word "toppar"
+    # These are likely components with topology/parameters added separately
+    # which will need to be copied to the openmm folder
+    # The following command processes those lines by keeping everything up 
+    # to the (last) forward slash and then filtering these by uniqueness
+    # to remove duplicate entries originating from separate reading of
+    # top/rtf- and par/prm files.
+    add_ids=`grep -v "toppar" openmm/toppar.str | sed -e 's:^\(.*\)\(/.*\)$:\1:' | uniq`
+    
+    if [ ! "$add_ids" = "" ]; then
+      # Set the separator temporarily to '\n' and create and array from the ids
+      IFS=$'\n' add_ids_arr=(${add_ids})
+    
+      # Loop through the ids and copy their folders to the openmm folder
+      for thisid in "${add_ids_arr[@]}"; do
+        `cp -r $thisid openmm/`
+      done
+    else
+      echo "No additional topologies/parameters found in toppar.str"
+    fi
 
-
+    # SIMULATION BOX SIZE
     # Produce sysinfo.dat from step2.1_waterbox.prm 
     # Only for cubic box so far
     dima=`sed -n -e "s/^.*\(SET A = \)//p" step2.1_waterbox.prm`
@@ -256,7 +327,7 @@ runmenu () {
     ocif+="increment I by 1                                                                \n"
     ocif+="define bbcur sele BB .subset. @I end                                            \n"
     ocif+="calc bbommidx = ?selatom - 1                                                    \n"
-    ocif+="echo @bbommidx BB                                                               \n"
+    ocif+="if @bbommidx .GE. 0 echo @bbommidx BB ! Avoids -1 BB if sele BB is empty        \n"
     ocif+="if @I .LT. @bbnum goto bblist                                                   \n"
     ocif+="                                                                                \n"
     ocif+="define SC sele SC end                                                           \n"
@@ -266,38 +337,43 @@ runmenu () {
     ocif+="increment I by 1                                                                \n"
     ocif+="define sccur sele SC .subset. @I end                                            \n"
     ocif+="calc scommidx = ?selatom - 1                                                    \n"
-    ocif+="echo @scommidx SC                                                               \n"
+    ocif+="if @scommidx .GE. 0 echo @scommidx SC ! Avoids -1 SC if sele SC is empty        \n"
     ocif+="if @I .LT. @scnum goto sclist                                                   \n"
     ocif+="echu                                                                            \n"
     ocif+="                                                                                \n"
     ocif+="! Write out PSF, CRD and PDB                                                    \n"
-    ocif+="open write unit 10 card name openmm/step3.1_omm.psf                             \n"
+    ocif+="open write unit 10 card name openmm/step3_input.psf                             \n"
     ocif+="write  psf unit 10 card                                                         \n"
     ocif+="                                                                                \n"
-    ocif+="open write unit 10 card name openmm/step3.1_omm.crd                             \n"
+    ocif+="open write unit 10 card name openmm/step3_input.crd                             \n"
     ocif+="write coor unit 10 card                                                         \n"
     ocif+="                                                                                \n"
-    ocif+="open write unit 10 card name openmm/step3.1_omm.pdb                             \n"
+    ocif+="open write unit 10 card name openmm/step3_input.pdb                             \n"
     ocif+="write coor unit 10 pdb                                                          \n"
     ocif+="                                                                                \n"
     ocif+="stop                                                                            \n"
     ocif+="                                                                                \n"
 
-    ommcinp="step3.1_omm.inp"
-    if [ -f "$ommcinp" ]; then
-      echo "OpenMM conversion CHARMM input: $ommcinp found. Using this."
+    ommcinp="${ommcname}.inp"
+    if [ -f "${ommcinp}" ]; then
+      echo ""
+      echo "OpenMM conversion CHARMM input: ${ommcinp} found. Using this."
     else
-      printf "%b" "$ocif" > "$ommcinp"
+      printf "%b" "${ocif}" > "${ommcinp}"
+      echo ""
       echo "An OpenMM conversion CHARMM input file was not provided."
-      echo "Using the standard/built-in scheme. Created file: $ommcinp"
+      echo "Using the standard/built-in scheme. Created file: ${ommcinp}"
       echo "This file can be modified and as long as it is present,"
       echo "it will be used if this process option is selected again."
     fi
 
     # Create OpenMM coordinates by shifting CHARMM coordinates
+    echo ""
     echo "Shifting coordinates to OpenMM origin..."
     echo ""
-    charmm < step3.1_omm.inp > step3.1_omm.out && tail -n 6 step3.1_omm.out && runmenu
+    charmm_exec < "${ommcinp}" > "${ommcname}.out" &&\
+        tail -n 6 ${ommcname}.out &&\
+        runmenu
 
 ###############################################################################
 
@@ -315,8 +391,6 @@ runmenu () {
     omm_step4_eq="step4_equilibration.inp"
     omm_step5_prod="step5_production.inp"
 
-    #cgommpyloc_def="/scratch/data/asmund/proteins/mbls/mod_systems/new_openmm"
-    cgommpyloc_def="$PWD/prev_openmm_1"
     cgommpyloc_def=$(realpath "$cgommpyloc_def")
 
     echo "The default location of the CG OpenMM CHARMM interpreter scripts is:"
@@ -418,7 +492,7 @@ runmenu () {
     sed -e "s/#SBATCH -J .*/#SBATCH -J ${systemname}/g" openmm/submit.sh > openmm/submit_rn.sh && mv openmm/submit_rn.sh openmm/submit.sh
     
     # Update the path to the input PSF 
-    sed -e "s/init=.*/init=step3.1_omm/g" openmm/submit.sh > openmm/submit_rn.sh && mv openmm/submit_rn.sh openmm/submit.sh
+    sed -e "s/init=.*/init=step3_input/g" openmm/submit.sh > openmm/submit_rn.sh && mv openmm/submit_rn.sh openmm/submit.sh
    
     echo "Enter simulation length (default: 1 ns) and time step (default: 2 fs)"
     echo "Example: 100 2"
@@ -538,7 +612,7 @@ runmenu () {
 
 ###############################################################################
 
-  elif [ "$menuoption" = "9" ]; then
+  elif [ "$menuoption" = "a" ]; then
     runsubmenu
 
 ###############################################################################
