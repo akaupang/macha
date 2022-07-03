@@ -9,6 +9,6 @@ It is recommended to set an alias for the script for convenient usage, e.g. in y
 
 export PATH="/path/to/charmm/bin:$PATH"
 
-\# Create an alias for the script
+\# Create an alias for the script e.g. in your .bashrc .
 
 alias macha="/path/to/manual_charmm_system_setup.sh"
