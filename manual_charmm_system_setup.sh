@@ -4,12 +4,15 @@
 # CHARMM binary
 # NOTE - if a path to the CHARMM binary
 # Check if "charmm" is in the PATH
-charmm_bin_man=""
+charmm_bin_man="/home/manny/charmm/bin/charmm"
 
 if [ "${charmm_bin_man}" = "" ];then
   if ! command -v charmm &> /dev/null; then
     echo "The CHARMM binary must be available to this tool, either through"
-    echo "the $PATH, or by setting its location in the script."
+    echo "the PATH, or by setting its location in the script."
+    echo ""
+    echo "Current PATH:"
+    echo $PATH
     exit
   else
     charmm_bin="charmm"
@@ -20,6 +23,8 @@ fi
 
 # MBL system modification script directory
 mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
+mblpyname="mbl_system_modifications.py"
+mblconfname="mbl_mod_configuration.yaml"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
 # Default is the directory created upon creation of a modified OpenMM system,
@@ -54,29 +59,36 @@ runsubmenu () {
 
   if [ "$submenuoption" = "1" ]; then
     echo ""
-    echo "Input ligand name=ligand toppar directory name"
+    echo "Input ligand name=ligand toppar directory name (or type \"return\"+Enter to return)"
     read ligname
-    ligtopparblock="\n"
-    ligtopparblock+="! Ligand topology and parameter files\n"
-    ligtopparblock+="open read card unit 10 name ${ligname}/${ligname}.rtf\n"
-    ligtopparblock+="read  rtf card unit 10 append\n"
-    ligtopparblock+="\n"
-    ligtopparblock+="open read card unit 20 name ${ligname}/${ligname}.prm\n"
-    ligtopparblock+="read para flex card unit 20 append\n"
-    ligtopparblock+="\n"
+    if [ "${ligname}" = "return" ]; then
+      runsubmenu
+    else
+      ligtopparblock="\n"
+      ligtopparblock+="! Ligand topology and parameter files\n"
+      ligtopparblock+="open read card unit 10 name ${ligname}/${ligname}.rtf\n"
+      ligtopparblock+="read  rtf card unit 10 append\n"
+      ligtopparblock+="\n"
+      ligtopparblock+="open read card unit 20 name ${ligname}/${ligname}.prm\n"
+      ligtopparblock+="read para flex card unit 20 append\n"
+      ligtopparblock+="\n"
 
-    printf "%b" "$ligtopparblock" >> "toppar.str"
-
-    echo "Added ligand topology/parameter files to the toppar.str"
+      printf "%b" "$ligtopparblock" >> "toppar.str"
+      
+      echo ""
+      echo ""
+      echo "Added ligand topology/parameter files to the toppar.str"
+    fi
     runsubmenu
 
 elif [ "$submenuoption" = "2" ];then
     mblpyloc_def=$(realpath "$mblpyloc_def")
     echo ""
+    echo ""
     echo "Looking for MBL system modification scripts in:"
     echo ${mblpyloc_def}
-    if [[ -f "${mblpyloc_def}/charmm_mbl_system_modification_variables.py" && -f "${mblpyloc_def}/charmm_mbl_system_modifications.py" ]];then
-      python3 -u ${mblpyloc_def}/charmm_mbl_system_modification_variables.py $PWD &&\
+    if [[ -f "${mblpyloc_def}/${mblpyname}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname} $PWD ${mblconfname} &&\
       echo "System modification hooks added to input files"
     else
       echo "MBL system modification scripts not found! Please provide a valid location and set this in the macha script file."
