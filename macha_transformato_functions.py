@@ -9,6 +9,7 @@ import sys
 import os
 import glob
 import shutil
+import subprocess
 
 ################################################################################
 ### FUNCTIONS
@@ -129,4 +130,59 @@ def inputFileInserter(inpfile, cases, blocks, inversions):
                                    f"\n"\
                                    f"{block}\n"
                 out.write(line)
+
+def makeFolder(path):
+    try:
+        os.makedirs(path)
+    except OSError:
+        if not os.path.isdir(path):
+            raise
+            
+def makeTFFolderStructure(ligand_id, parent_dir="."):
+    makeFolder(f"{parent_dir}/{ligand_id}")
+    makeFolder(f"{parent_dir}/{ligand_id}/complex")
+    makeFolder(f"{parent_dir}/{ligand_id}/waterbox")
+    
+def getTopparFromLocalCGenFF(ligands_dir, ligand_id, ligand_ext="mol2", cgenff_path=False, parent_dir="."):
+    cgenff_bin = None
+    cgenff_output = None
+
+    
+    # If no particular path is given, check whether CGenFF is available
+    if cgenff_path == False:
+        cgenff_path = shutil.which('cgenff')
+        if cgenff_path == None:
+            print("This function requires cgenff.")
+            print("Please install it in the active environment or point the routine")
+            print("to the right path using the key cgenff_path='/path/to/cgenff' .")
+        else:
+            cgenff_bin = cgenff_path
+    else:
+        cgenff_bin = cgenff_path
+
+    # CGenFF exists - start program
+    if cgenff_bin != None:
+        
+        # Run CGenFF
+        ligand_path = f"{parent_dir}/{ligands_dir}/{ligand_id}.{ligand_ext}"
+       
+        cgenff_output = subprocess.run(#
+                                        [cgenff_bin] + [ligand_path] + ["-v"] + ["-f"] + [f"{ligand_id}/{ligand_id}.str"] + ["-m"] + [f"{ligand_id}/{ligand_id}.log"],#
+                                        #[cgenff_bin] + [ligand_path] + ["-v"] + ["-m"] + [f"{ligand_id}.log"],#
+                                        capture_output=True,
+                                        text=True#
+                                        )
+        
+        # Evaluate the subprocess return code
+        if cgenff_output.returncode == 1:
+            print(f"CGenFF returned an error after being called with:\n")
+            print(' '.join(cgenff_output.args))
+            print(cgenff_output.stdout)
+            print(cgenff_output.stderr)
+        else:
+            print(f"CGenFF executed successfully")
+            #print(cgenff_output.stdout)
+            #print(cgenff_output.stderr)
+            
+    return cgenff_output
 

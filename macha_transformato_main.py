@@ -16,10 +16,11 @@ from macha_transformato_functions import *
 ### VARIABLES/SETTINGS
 ################################################################################
 
+parent_dir = "."
 original_dir = "original"
 ligands_dir = "ligands"
-input_ext = "pdb"
-
+input_ext = "mol2"# for testing - should be pdb
+cgenff_path = "/home/manny/Documents/Work/UiO/Modeling/wien/ligands/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 
 ################################################################################
 # MAIN (WORK)
@@ -34,10 +35,10 @@ input_ext = "pdb"
 try:
     ligand_id = sys.argv[1]
     # Check for existence of ligands/"ligandid"  
-    if os.path.exists(f"{ligands_dir}/{ligand_id}.{input_ext}"):
+    if os.path.exists(f"{parent_dir}/{ligands_dir}/{ligand_id}.{input_ext}"):
         pass
     else:
-        sys.exit(f"Input file: {ligands_dir}/{ligand_id}.{input_ext} not found!")
+        sys.exit(f"Input file: {parent_dir}/{ligands_dir}/{ligand_id}.{input_ext} not found!")
         
 # If no argument is given, run in multiple ligand mode
 except IndexError:
@@ -47,7 +48,7 @@ except IndexError:
 # the findings above
 ligand_ids = []
 if ligand_id == None:
-    for ifile in glob.glob(f"{ligands_dir}/*.{input_ext}"):
+    for ifile in glob.glob(f"{parent_dir}/{ligands_dir}/*.{input_ext}"):
         ligand_ids.append(#
                           os.path.splitext(os.path.basename(ifile))[0]
                           )
@@ -58,9 +59,42 @@ else:
     
 ###############################################################################
 
+# ITERATE THROUGH LIGANDS
+for ligand_id in ligand_ids:
+    # Make a Transformato style folder structure below a folder bearing
+    # the name of the ligand
+    makeTFFolderStructure(ligand_id)
     
-# based on ligands make transformato directories
-# run cgenff on ligands
-# copy from template dir to each
-# modify input step1
+    # Get the toppar stream from a local CGenFF binary
+    # getTopparFromLocalCGenFF(ligands_dir, ligand_id, ligand_ext="mol2", cgenff_path=False, parent_dir="."):
+    ligand_cgenff_output = getTopparFromLocalCGenFF(ligands_dir, ligand_id, cgenff_path=cgenff_path)
+    
+    if ((os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.str")) and (os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.log"))):
+        makeFolder(f"{parent_dir}/{ligand_id}/complex/{ligand_id}")
+        makeFolder(f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}")
+        
+        shutil.copy(f"{parent_dir}/{ligand_id}/{ligand_id}.str", f"{parent_dir}/{ligand_id}/complex/{ligand_id}/{ligand_id}.str")
+        shutil.copy(f"{parent_dir}/{ligand_id}/{ligand_id}.log", f"{parent_dir}/{ligand_id}/complex/{ligand_id}/{ligand_id}.log")
+        shutil.copy(f"{parent_dir}/{ligand_id}/{ligand_id}.str", f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}/{ligand_id}.str")
+        shutil.copy(f"{parent_dir}/{ligand_id}/{ligand_id}.log", f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}/{ligand_id}.log")
 
+        os.remove(f"{parent_dir}/{ligand_id}/{ligand_id}.str")
+        os.remove(f"{parent_dir}/{ligand_id}/{ligand_id}.log")
+
+    else:
+        sys.exit(f"Stream/log file: {parent_dir}/{ligand_id}/{ligand_id}.str/log not found!")    
+        
+        
+    # COPY TEMPLATE FROM TEMPLATE FOLDER
+    
+    # MODIFY INPUT FILES FOR COMPLEX AND WATERBOX (FOR THIS LIGAND)
+    
+    # Suggested usage of inputFileInserter
+    # - concatenate the blocks to be inserted using the respective functions
+    # - then give the case ["stream toppar.str"]
+    # - tell inputFileInserter to insert the block _after_ the case is found, so;
+    # inputFileInserter(pathtoinputfile, ["stream toppar.str"], [concatenated_blocks], [False])
+    # Note that each argument is a list with a single value - it needs to be this way since the function was made to make 
+    # several such insertions in the same file, at different places.
+    
+    
