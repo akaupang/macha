@@ -3,14 +3,14 @@
 """
 Created on Mon Jul 25 12:03:58 2022
 
-@author: Johannes Karwanoupoulos and Åsmund Kaupang
+@author: Johannes Karwounopoulos and Åsmund Kaupang
 """
 
 import sys
 import os
 import glob
 
-from macha_transformato_functions import Preparation
+from macha_transformato_functions import Preparation, CharmmManipulation
 
 ################################################################################
 ### VARIABLES/SETTINGS
@@ -71,45 +71,20 @@ for ligand_id in ligand_ids:
     # Make a Transformato style folder structure below a folder bearing
     # the name of the ligand
     preparation.makeTFFolderStructure()
-
     preparation.createCRDfiles()
 
     # Get the toppar stream from a local CGenFF binary
-    # getTopparFromLocalCGenFF(ligands_dir, ligand_id, ligand_ext="mol2", cgenff_path=False, parent_dir="."):
-    ligand_cgenff_output = preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
-
-    # if (os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.str")) and (
-    #     os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.log")
-    # ):
-    #     makeFolder(f"{parent_dir}/{ligand_id}/complex/{ligand_id}")
-    #     makeFolder(f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}")
-
-    #     shutil.copy(
-    #         f"{parent_dir}/{ligand_id}/{ligand_id}.str",
-    #         f"{parent_dir}/{ligand_id}/complex/{ligand_id}/{ligand_id}.str",
-    #     )
-    #     shutil.copy(
-    #         f"{parent_dir}/{ligand_id}/{ligand_id}.log",
-    #         f"{parent_dir}/{ligand_id}/complex/{ligand_id}/{ligand_id}.log",
-    #     )
-    #     shutil.copy(
-    #         f"{parent_dir}/{ligand_id}/{ligand_id}.str",
-    #         f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}/{ligand_id}.str",
-    #     )
-    #     shutil.copy(
-    #         f"{parent_dir}/{ligand_id}/{ligand_id}.log",
-    #         f"{parent_dir}/{ligand_id}/waterbox/{ligand_id}/{ligand_id}.log",
-    #     )
-
-    #     os.remove(f"{parent_dir}/{ligand_id}/{ligand_id}.str")
-    #     os.remove(f"{parent_dir}/{ligand_id}/{ligand_id}.log")
-
-    # else:
-    #     sys.exit(
-    #         f"Stream/log file: {parent_dir}/{ligand_id}/{ligand_id}.str/log not found!"
-    #     )
+    preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
+    preparation.copyREStocomplex()
 
     # COPY TEMPLATE FROM TEMPLATE FOLDER
+    charmmManipulation = CharmmManipulation(
+        parent_dir=parent_dir, ligand_id=ligand_id, original_dir=original_dir
+    )
+
+    charmmManipulation.manipulateToppar(preparation.resname)
+    charmmManipulation.copyINPfiles()
+    charmmManipulation.prepareStep1()
 
     # MODIFY INPUT FILES FOR COMPLEX AND WATERBOX (FOR THIS LIGAND)
 

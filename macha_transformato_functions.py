@@ -3,7 +3,7 @@
 """
 Created on Mon Jul 25 15:50:05 2022
 
-@author: Johannes Karwanoupoulos and Åsmund Kaupang
+@author: Johannes Karwounopoulos and Åsmund Kaupang
 """
 import sys
 import os
@@ -149,6 +149,7 @@ def inputFileInserter(inpfile, cases, blocks, inversions):
 
 
 class Preparation:
+
     def __init__(self, parent_dir, ligand_id, original_dir):
         self.parent_dir = parent_dir
         self.ligand_id = ligand_id
@@ -156,6 +157,7 @@ class Preparation:
         self.resname = str
 
     def makeFolder(self, path):
+
         try:
             os.makedirs(path)
             print(f"Creating folder in {path}")
@@ -164,6 +166,7 @@ class Preparation:
                 raise
 
     def makeTFFolderStructure(self):
+
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/complex")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/waterbox")
@@ -180,14 +183,31 @@ class Preparation:
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
         mol = openbabel.OBMol()
-        obConversion.ReadFile(mol, f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb")   # Open Babel will uncompress automatically
-        print(f'der pfad {self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb')
+        obConversion.ReadFile(mol, f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb")
         #mol.AddHydrogens() TODO: Do we need this?
 
         assert (mol.NumResidues()) == 1
-
         obConversion.WriteFile(mol,f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2")
         
+    def _modify_resname_in_str(self):
+        
+        fin = open(f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str", "rt")
+        fout = open(f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}_tmp.str", "wt")
+        for line in fin:
+            if line.startswith("RESI"):
+                fout.write(line.replace(line.split()[1], 'UNK'))
+            else:
+                fout.write(line)
+
+        fin.close()
+        fout.close()
+
+        shutil.copy(fout.name,fin.name)
+    
+    def copyREStocomplex(self):
+
+        for file in glob.glob(f"{self.ligand_id}/waterbox/{self.resname.upper()}/*"):
+            shutil.copy(file, f"{self.ligand_id}/complex/{self.resname.upper()}/")
 
 
     def getTopparFromLocalCGenFF(
@@ -197,6 +217,7 @@ class Preparation:
         cgenff_bin = None
         cgenff_output = None
 
+        # CGenFF needs a mol2 file as input file
         self._create_mol2_file()
 
         # If no particular path is given, check whether CGenFF is available
@@ -246,6 +267,8 @@ class Preparation:
                 print(f"CGenFF executed successfully")
                 # print(cgenff_output.stdout)
                 # print(cgenff_output.stderr)
+        
+        self._modify_resname_in_str()
 
         return cgenff_output
 
@@ -293,6 +316,9 @@ class Preparation:
                         i.residue.chain = f"HETA"
                         self.resname = i.residue.name
                     else:
+                        if i.residue.name == "HIS":
+                            i.residue.name = "HSD" # ATTENTION!! Here we make all HIS to HSD
+                            i.residue.chain = f"PRO{chain}"
                         i.residue.chain = f"PRO{chain}"
 
             self.makeFolder(
@@ -364,3 +390,66 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                             overwrite=True,
                         )
+        
+        # resname should be a 3 or 4 letters code                
+        assert len(self.resname) < 5
+
+
+class CharmmManipulation():
+    
+    def __init__(self, parent_dir, ligand_id, original_dir):
+
+        self.parent_dir = parent_dir
+        self.ligand_id = ligand_id
+        self.original_dir = original_dir
+        self.default_path = f"{self.parent_dir}/templates/default/"
+        self.resname: str = None
+
+    def manipulateToppar(self, resname):
+        
+        self.resname = resname
+        shutil.copy(f"{self.default_path}/toppar.str", f"{self.ligand_id}/waterbox/toppar.str")
+        shutil.copy(f"{self.default_path}/toppar.str", f"{self.ligand_id}/complex/toppar.str")
+        try:
+            shutil.copytree(f"{self.default_path}/toppar", f"{self.ligand_id}/complex/toppar")
+            shutil.copytree(f"{self.default_path}/toppar", f"{self.ligand_id}/waterbox/toppar")                  
+        except:
+            print(f"Toppar directory is already available")
+
+        # manipulate toppar.str file
+        file = open(f"{self.ligand_id}/waterbox/toppar.str","a")
+        file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
+        file.close()
+        file = open(f"{self.ligand_id}/complex/toppar.str","a")
+        file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
+        file.close()
+
+    def copyINPfiles(self):
+        for file in glob.glob(f"{self.default_path}/*.inp"):
+            shutil.copy(file, f"{self.ligand_id}/waterbox/")
+            shutil.copy(file, f"{self.ligand_id}/complex/")        
+
+    def prepareStep1(self):
+
+        correction_on = False
+        
+        fout = open(f"{self.ligand_id}/waterbox/step1_pdbreader_tmp.inp", "wt")
+        with open(f"{self.ligand_id}/waterbox/step1_pdbreader.inp", "r+") as f:
+            for line in f:
+                if line.startswith("! Read PROA"):
+                    correction_on = True
+                    f.readline()
+                    fout.write('Hallihallo \n')
+                    fout.write('und das hier noch \n')
+                    fout.write('und das \n')
+
+                if line.startswith("!Print heavy atoms with "):
+                    fout.write(f"{line}")
+                    correction_on = False
+                    
+                if correction_on == True:
+                    pass
+                else:
+                    fout.write(line)
+
+
