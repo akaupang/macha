@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import parmed as pm
 import pandas as pd
-import logging
+from openbabel import openbabel
 
 ################################################################################
 ### FUNCTIONS
@@ -153,14 +153,13 @@ class Preparation:
         self.parent_dir = parent_dir
         self.ligand_id = ligand_id
         self.original_dir = original_dir
+        self.resname = str
 
     def makeFolder(self, path):
-        print(f"Being in the fuc=nciton {path}")
         try:
             os.makedirs(path)
             print(f"Creating folder in {path}")
         except OSError:
-            print("but only here")
             if not os.path.isdir(path):
                 raise
 
@@ -169,11 +168,36 @@ class Preparation:
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/complex")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/waterbox")
 
+        print(
+            f"Creating folders in {self.parent_dir}/{self.ligand_id} for complex and waterbox"
+        )
+
+
+    def _create_mol2_file(self):
+
+        print(f"Converting the residue pdb file to a mol2 file")
+
+        obConversion = openbabel.OBConversion()
+        obConversion.SetInAndOutFormats("pdb", "mol2")
+        mol = openbabel.OBMol()
+        obConversion.ReadFile(mol, f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb")   # Open Babel will uncompress automatically
+        print(f'der pfad {self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb')
+        #mol.AddHydrogens() TODO: Do we need this?
+
+        assert (mol.NumResidues()) == 1
+
+        obConversion.WriteFile(mol,f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2")
+        
+
+
     def getTopparFromLocalCGenFF(
-        ligands_dir, ligand_id, ligand_ext="mol2", cgenff_path=False, parent_dir="."
+        self,
+        cgenff_path=False,
     ):
         cgenff_bin = None
         cgenff_output = None
+
+        self._create_mol2_file()
 
         # If no particular path is given, check whether CGenFF is available
         if cgenff_path == False:
@@ -193,16 +217,20 @@ class Preparation:
         if cgenff_bin != None:
 
             # Run CGenFF
-            ligand_path = f"{parent_dir}/{ligands_dir}/{ligand_id}.{ligand_ext}"
+            ligand_path = f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2"
 
             cgenff_output = subprocess.run(  #
                 [cgenff_bin]
                 + [ligand_path]
                 + ["-v"]
                 + ["-f"]
-                + [f"{ligand_id}/{ligand_id}.str"]
+                + [
+                    f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str"
+                ]
                 + ["-m"]
-                + [f"{ligand_id}/{ligand_id}.log"],  #
+                + [
+                    f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.log"
+                ],
                 # [cgenff_bin] + [ligand_path] + ["-v"] + ["-m"] + [f"{ligand_id}.log"],#
                 capture_output=True,
                 text=True,  #
@@ -226,10 +254,10 @@ class Preparation:
         pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
         df = pdb_file.to_dataframe()
         segids = set(i.residue.chain for i in pdb_file)
-        print(f" die segids {segids}")
         if (
             len(segids) > 1
         ):  # for pdb file created with MAESTRO containing the chaing segment
+            print(f"Processing a Maestro based pdb file")
             aa = [
                 "ALA",
                 "ARG",
@@ -255,16 +283,28 @@ class Preparation:
                 "HSD",
                 "HSE",
             ]  # we need to finde the residue of the ligand which should be the only one beeing not an aa
-            for chain in segids:  # renamin of the chain (a,b, ...) to segnames (proa,prob,...)
+            for (
+                chain
+            ) in (
+                segids
+            ):  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
                 for i in pdb_file.view[df.chain == f"{chain}"]:
                     if i.residue.name not in aa:
                         i.residue.chain = f"HETA"
+                        self.resname = i.residue.name
                     else:
                         i.residue.chain = f"PRO{chain}"
 
+            self.makeFolder(
+                f"{self.parent_dir}/{self.ligand_id}/complex/{self.resname.upper()}"
+            )
+            self.makeFolder(
+                f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}"
+            )
+
             df = pdb_file.to_dataframe()
             segids = set(i.residue.chain for i in pdb_file)
-            for segid in segids: # now we can save the crd files 
+            for segid in segids:  # now we can save the crd files
                 if segid not in ["SOLV", "IONS"]:
                     if segid == "HETA":
                         pdb_file[df.chain == f"{segid}"].save(
@@ -275,27 +315,52 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/waterbox/{segid.lower()}.crd",
                             overwrite=True,
                         )
+                        pdb_file[df.chain == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+                            overwrite=True,
+                        )
                     else:
                         pdb_file[df.chain == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                            overwrite=True,
+                        )
+                        pdb_file[df.chain == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                             overwrite=True,
                         )
 
         else:  # CHARMM-GUI generated pdb files
+            print(f"Processing a CHARMM-GUI based pdb file")
             segids = set(i.residue.segid for i in pdb_file)
             for segid in segids:
                 if segid not in ["SOLV", "IONS"]:
                     if segid == "HETA":
+                        self.resname = pdb_file[df.segid == f"{segid}"].residues[0].name
+                        self.makeFolder(
+                            f"{self.parent_dir}/{self.ligand_id}/complex/{self.resname.upper()}"
+                        )
+                        self.makeFolder(
+                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}"
+                        )
                         pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        pdb_file[df.segid == f"HETA"].save(
+                        pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/waterbox/{segid.lower()}.crd",
                             overwrite=True,
                         )
+                        pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+                            overwrite=True,
+                        )
+
                     else:
                         pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                            overwrite=True,
+                        )
+                        pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                             overwrite=True,
                         )

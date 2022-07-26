@@ -50,9 +50,7 @@ except IndexError:
 # the findings above
 ligand_ids = []
 if ligand_id == None:
-    print(f"{parent_dir}/{ligands_dir}/*.{input_ext}")
     for ifile in glob.glob(f"{parent_dir}/{original_dir}/*.{input_ext}"):
-        print(ifile)
         ligand_ids.append(os.path.splitext(os.path.basename(ifile))[0])  #
 elif ligand_id != "":
     ligand_ids.append(ligand_id)
@@ -60,24 +58,25 @@ else:
     sys.exit(f"Unknown ligand (file) name error with name: {ligand_id}")
 
 ###############################################################################
-print(f"Hallo {ligand_id}")
+
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
 
-    # Make a Transformato style folder structure below a folder bearing
-    # the name of the ligand
+    print(f"Processing ligand {ligand_id}")
+
     preparation = Preparation(
         parent_dir=parent_dir, ligand_id=ligand_id, original_dir=original_dir
     )
+
+    # Make a Transformato style folder structure below a folder bearing
+    # the name of the ligand
     preparation.makeTFFolderStructure()
 
     preparation.createCRDfiles()
 
     # Get the toppar stream from a local CGenFF binary
     # getTopparFromLocalCGenFF(ligands_dir, ligand_id, ligand_ext="mol2", cgenff_path=False, parent_dir="."):
-    ligand_cgenff_output = preparation.getTopparFromLocalCGenFF(
-        ligands_dir, ligand_id, cgenff_path=cgenff_path
-    )
+    ligand_cgenff_output = preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
     # if (os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.str")) and (
     #     os.path.exists(f"{parent_dir}/{ligand_id}/{ligand_id}.log")
