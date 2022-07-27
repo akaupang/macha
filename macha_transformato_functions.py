@@ -13,6 +13,7 @@ import subprocess
 import parmed as pm
 import pandas as pd
 from openbabel import openbabel
+from charmm_factory import CharmmFactory
 
 ################################################################################
 ### FUNCTIONS
@@ -394,6 +395,8 @@ class Preparation:
         # resname should be a 3 or 4 letters code                
         assert len(self.resname) < 5
 
+        return segids
+
 
 class CharmmManipulation():
     
@@ -429,27 +432,27 @@ class CharmmManipulation():
             shutil.copy(file, f"{self.ligand_id}/waterbox/")
             shutil.copy(file, f"{self.ligand_id}/complex/")        
 
-    def prepareStep1(self):
+    def prepareStep1(self, segids, env):
 
         correction_on = False
-        
-        fout = open(f"{self.ligand_id}/waterbox/step1_pdbreader_tmp.inp", "wt")
-        with open(f"{self.ligand_id}/waterbox/step1_pdbreader.inp", "r+") as f:
+       
+        fout = open(f"{self.ligand_id}/{env}/step1_pdbreader_tmp.inp", "wt")
+        with open(f"{self.ligand_id}/{env}/step1_pdbreader.inp", "r+") as f:
             for line in f:
                 if line.startswith("! Read PROA"):
                     correction_on = True
                     f.readline()
-                    fout.write('Hallihallo \n')
-                    fout.write('und das hier noch \n')
-                    fout.write('und das \n')
-
+                    string = CharmmFactory.createHeader(segids, env)
+                    fout.write(f'{string} \n')
                 if line.startswith("!Print heavy atoms with "):
-                    fout.write(f"{line}")
                     correction_on = False
                     
                 if correction_on == True:
                     pass
                 else:
                     fout.write(line)
+        fout.close()
 
+        shutil.copy(fout.name, f"{self.ligand_id}/{env}/step1_pdbreader.inp")
+        os.remove(fout.name)
 

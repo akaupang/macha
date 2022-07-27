@@ -71,7 +71,7 @@ for ligand_id in ligand_ids:
     # Make a Transformato style folder structure below a folder bearing
     # the name of the ligand
     preparation.makeTFFolderStructure()
-    preparation.createCRDfiles()
+    segids = preparation.createCRDfiles()
 
     # Get the toppar stream from a local CGenFF binary
     preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
@@ -84,7 +84,8 @@ for ligand_id in ligand_ids:
 
     charmmManipulation.manipulateToppar(preparation.resname)
     charmmManipulation.copyINPfiles()
-    charmmManipulation.prepareStep1()
+    charmmManipulation.prepareStep1(segids, env = "waterbox")
+    charmmManipulation.prepareStep1(segids, env = "complex")
 
     # MODIFY INPUT FILES FOR COMPLEX AND WATERBOX (FOR THIS LIGAND)
 
