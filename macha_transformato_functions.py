@@ -272,10 +272,24 @@ class Preparation:
         self._modify_resname_in_str()
 
         return cgenff_output
+    
+    def _remove_lp(self, pdb_file_orig):
+        # Will check if there are lone pairs and remove them
+        # CGenFF will add them later on
+        pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb") # TODO: That might be solved smarter 
 
+        for atom in pdb_file:
+            if atom.name.startswith('LP'):
+                print(f'We will remove {atom}')
+                pdb_file_orig.strip(f'@ {atom.idx}')
+                assert atom.element_name == 'EP'
+
+        return pdb_file_orig
+    
     def createCRDfiles(self):
 
         pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+        pdb_file = self._remove_lp(pdb_file_orig)
         df = pdb_file.to_dataframe()
         segids = set(i.residue.chain for i in pdb_file)
         if (
