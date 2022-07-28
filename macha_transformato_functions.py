@@ -5,175 +5,73 @@ Created on Mon Jul 25 15:50:05 2022
 
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
+
 import sys
 import os
 import glob
 import shutil
 import subprocess
 import parmed as pm
-import pandas as pd
 from openbabel import openbabel
 from charmm_factory import CharmmFactory
 
-################################################################################
-### FUNCTIONS
-################################################################################
-# HET BLOCK GENERATION
-################################################################################
-def genPROblock(protein_id, segment_id="PROA"):
+def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
 
-    block = (
-        f"!-------------------------------------------------------------------------------\n"
-        f"! PROTEIN:\n"
-        f"open read card unit 10 name {protein_id.lower()}_{segment_id.lower()}.crd\n"
-        f"read sequence coor card unit 10 resid\n"
-        f"generate {segment_id.upper()} setup warn first NTER last CTER\n"
-        f"\n"
-        f"open read unit 10 card name {protein_id.lower()}_{segment_id.lower()}.crd\n"
-        f"read coor unit 10 card resid\n"
-        f"!-------------------------------------------------------------------------------\n"
-    )
-
-    return block
-
-
-def genHETblock(ligand_id, segment_id="HETA"):
-
-    block = (
-        f"!-------------------------------------------------------------------------------\n"
-        f"open read card unit 10 name {ligand_id.lower()}.crd\n"
-        f"read sequence coor card unit 10 resid\n"
-        f"generate {segment_id.upper()} setup warn first none last none\n"
-        f"\n"
-        f"open read unit 10 card name {ligand_id.lower()}.crd\n"
-        f"read coor unit 10 card resid\n"
-        f"!-------------------------------------------------------------------------------\n"
-    )
-
-    return block
-
-
-def genWATblock(protein_id, segment_id="WATA"):
-
-    block = (
-        f"!-------------------------------------------------------------------------------\n"
-        f"open read card unit 10 name {protein_id.lower()}_{segment_id.lower()}.crd\n"
-        f"read sequence coor card unit 10 resid\n"
-        f"generate {segment_id.upper()} setup warn noangle nodihedral\n"
-        f"\n"
-        f"open read unit 10 card name {protein_id.lower()}_{segment_id.lower()}.crd\n"
-        f"read coor unit 10 card resid\n"
-        f"!-------------------------------------------------------------------------------\n"
-    )
-
-    return block
-
-
-################################################################################
-# HBUILD CONTROL
-################################################################################
-def hbuild_preserve_explicit_H(segids):
-
-    segid_head = f"hbuild sele hydr .and. .not. ("
-    segid_vars = ""
-    for idx, segid in enumerate(segids):
-        if idx == len(segids) - 1:
-            segid_add = f"segid {segid}"
+    try:
+        ligand_id = sys.argv[1]
+        # Check for existence of ligands/"ligandid"
+        if os.path.exists(f"{parent_dir}/{ligands_dir}/{ligand_id}.{input_ext}"):
+            pass
         else:
-            segid_add = f"segid {segid} .or. "
-        segid_vars = segid_vars + segid_add
-    segid_tail = f") end"
+            sys.exit(
+                f"Input file: {parent_dir}/{ligands_dir}/{ligand_id}.{input_ext} not found!"
+            )
 
-    block = (
-        f"!-------------------------------------------------------------------------------\n"
-        f"! MOD: HBUILD control - preserve explicit H-coordinates\n"
-        f"prnlev 5\n"
-        f"echo START_HBUILD\n"
-        f"{segid_head + segid_vars + segid_tail}\n"
-        f"echo END_HBUILD\n"
-        f"!-------------------------------------------------------------------------------\n"
-    )
-    return block
+    # If no argument is given, run in multiple ligand mode
+    except IndexError:
+        ligand_id = None  # None in particular
 
-
-################################################################################
-# PRINT USED PARAMETERS
-################################################################################
-def insert_parameter_print():
-    block = (
-        f"!-------------------------------------------------------------------------------\n"
-        f"! MOD: Print used parameters\n"
-        f"echo START_PAR\n"
-        f"print para used\n"
-        f"echo END_PAR\n"
-        f"!-------------------------------------------------------------------------------\n"
-    )
-    return block
-
-
-################################################################################
-# OTHER FUNCTIONS
-################################################################################
-
-
-def streamWriter(work_dir, stream_name, blocks_as_lst):
-    with open(f"{work_dir}/{stream_name}.str", "w") as ostr:
-        for block in blocks_as_lst:
-            ostr.write(block)
-
-
-def inputFileInserter(inpfile, cases, blocks, inversions):
-    assert len(cases) == len(blocks)
-
-    # Check for the presence of a backup, and start from this
-    # or make a backup if none exists
-    if os.path.exists(f"{inpfile}.premod"):
-        shutil.copy(f"{inpfile}.premod", f"{inpfile}")
+    # Create the master list of the ligand/system names and fill it based on
+    # the findings above
+    ligand_ids = []
+    if ligand_id == None:
+        for ifile in glob.glob(f"{parent_dir}/{original_dir}/*.{input_ext}"):
+            ligand_ids.append(os.path.splitext(os.path.basename(ifile))[0])  #
+    elif ligand_id != "":
+        ligand_ids.append(ligand_id)
     else:
-        shutil.copy(f"{inpfile}", f"{inpfile}.premod")
+        sys.exit(f"Unknown ligand (file) name error with name: {ligand_id}")
 
-    inp_backup = f"{inpfile}.premod"
-    outfile = inpfile
-
-    with open(outfile, "w") as out:
-        with open(inp_backup, "r") as inf:
-            for line in inf:
-                for case, block, inversion in zip(cases, blocks, inversions):
-                    if case in line:
-                        if inversion == True:
-                            line = f"{block}\n" f"\n" f"{case}\n"
-                        elif inversion == None:
-                            line = f"{block}\n"
-                        else:
-                            line = f"{case}\n" f"\n" f"{block}\n"
-                out.write(line)
+    return ligand_ids
 
 
 class Preparation:
-    def __init__(self, parent_dir, ligand_id, original_dir):
+    def __init__(self, parent_dir, ligand_id, original_dir, env):
+        """
+        This class prepares everything for further use with CHARMM. The pdb files are sliced into pieces 
+        and the ligand is converted to a mol2 file.
+        A local version of CGenFF creates a stream file for the ligand.
+        """
         self.parent_dir = parent_dir
         self.ligand_id = ligand_id
         self.original_dir = original_dir
         self.resname = str
+        self.env: str = env
 
     def makeFolder(self, path):
 
         try:
             os.makedirs(path)
-            print(f"Creating folder in {path}")
+            print(f"Creating folder in {path} for the {self.env}")
         except OSError:
+            print(f"There exists a folder in {path} for {self.env} we will use it")
             if not os.path.isdir(path):
                 raise
 
     def makeTFFolderStructure(self):
 
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}")
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/complex")
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/waterbox")
-
-        print(
-            f"Creating folders in {self.parent_dir}/{self.ligand_id} for complex and waterbox"
-        )
+        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
 
     def _create_mol2_file(self):
 
@@ -184,24 +82,24 @@ class Preparation:
         mol = openbabel.OBMol()
         obConversion.ReadFile(
             mol,
-            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
         # mol.AddHydrogens() TODO: Do we need this?
 
         assert (mol.NumResidues()) == 1
         obConversion.WriteFile(
             mol,
-            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2",
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
         )
 
     def _modify_resname_in_str(self):
 
         fin = open(
-            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str",
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
             "rt",
         )
         fout = open(
-            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}_tmp.str",
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
             "wt",
         )
         for line in fin:
@@ -214,11 +112,6 @@ class Preparation:
         fout.close()
 
         shutil.copy(fout.name, fin.name)
-
-    def copyREStocomplex(self):
-
-        for file in glob.glob(f"{self.ligand_id}/waterbox/{self.resname.upper()}/*"):
-            shutil.copy(file, f"{self.ligand_id}/complex/{self.resname.upper()}/")
 
     def getTopparFromLocalCGenFF(
         self,
@@ -246,25 +139,25 @@ class Preparation:
 
         # CGenFF exists - start program
         if cgenff_bin != None:
+            
+            # remove str file otherwise cgenff will append the new one at the end
+            stream_file = f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
+            if os.path.isfile(stream_file):
+                os.remove(stream_file)
 
             # Run CGenFF
-            ligand_path = f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2"
+            ligand_path = f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}"
 
-            cgenff_output = subprocess.run(  #
+            cgenff_output = subprocess.run(
                 [cgenff_bin]
-                + [ligand_path]
+                + [f"{ligand_path}.mol2"]
                 + ["-v"]
                 + ["-f"]
-                + [
-                    f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str"
-                ]
+                + [f"{stream_file}"]
                 + ["-m"]
-                + [
-                    f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.log"
-                ],
-                # [cgenff_bin] + [ligand_path] + ["-v"] + ["-m"] + [f"{ligand_id}.log"],#
+                + [f"{ligand_path}.log"],
                 capture_output=True,
-                text=True,  #
+                text=True,
             )
 
             # Evaluate the subprocess return code
@@ -285,9 +178,7 @@ class Preparation:
     def _remove_lp(self, pdb_file_orig):
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
-        pdb_file = pm.load_file(
-            pdb_file_orig, structure=True
-        )  # TODO: That might be solved smarter
+        pdb_file = pm.load_file(pdb_file_orig, structure=True)
         lps = []
         for atom in pdb_file:
             if atom.name.startswith("LP"):
@@ -351,10 +242,7 @@ class Preparation:
                         i.residue.chain = f"PRO{chain}"
 
             self.makeFolder(
-                f"{self.parent_dir}/{self.ligand_id}/complex/{self.resname.upper()}"
-            )
-            self.makeFolder(
-                f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}"
+                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
             )
 
             df = pdb_file.to_dataframe()
@@ -363,26 +251,25 @@ class Preparation:
                 if segid not in ["SOLV", "IONS"]:
                     if segid == "HETA":
                         pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
                     else:
-                        pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
-                            overwrite=True,
-                        )
+                        try:
+                            pdb_file[df.chain == f"{segid}"].save(
+                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                                overwrite=True,
+                            )
+                            pdb_file[df.chain == f"{segid}"].save(
+                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
+                                overwrite=True,
+                            )
+                        except:
+                            pass
 
         else:  # CHARMM-GUI generated pdb files
             print(f"Processing a CHARMM-GUI based pdb file")
@@ -392,33 +279,29 @@ class Preparation:
                     if segid == "HETA":
                         self.resname = pdb_file[df.segid == f"{segid}"].residues[0].name
                         self.makeFolder(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{self.resname.upper()}"
-                        )
-                        self.makeFolder(
-                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}"
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
                         pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
 
                     else:
-                        pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
-                            overwrite=True,
-                        )
+                        try:
+                            pdb_file[df.segid == f"{segid}"].save(
+                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                                overwrite=True,
+                            )
+                            pdb_file[df.segid == f"{segid}"].save(
+                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
+                                overwrite=True,
+                            )
+                        except:
+                            pass
 
         # resname should be a 3 or 4 letters code
         assert len(self.resname) < 5
@@ -427,57 +310,52 @@ class Preparation:
 
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env):
+        """
+        CHARMM related files like the toppar file are modified, later the CHARMM executable is
+        executed
+        """ 
+        self.parent_dir: str = parent_dir
+        self.ligand_id: str = ligand_id
+        self.original_dir: str = original_dir
+        self.default_path: str = f"{self.parent_dir}/templates/default/"
+        self.resname: str = resname
+        self.env: str = env
 
-        self.parent_dir = parent_dir
-        self.ligand_id = ligand_id
-        self.original_dir = original_dir
-        self.default_path = f"{self.parent_dir}/templates/default/"
-        self.resname: str = None
+    def _manipulateToppar(self):
 
-    def manipulateToppar(self, resname):
+        # manipulate toppar.str file
+        file = open(f"{self.ligand_id}/{self.env}/toppar.str", "a")
+        file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
+        file.close()
 
-        self.resname = resname
+    def copyFiles(self):
+
+        for file in glob.glob(f"{self.default_path}/[!toppar]*"):
+            shutil.copy(file, f"{self.ligand_id}/{self.env}/")
         shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.ligand_id}/waterbox/toppar.str"
-        )
-        shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.ligand_id}/complex/toppar.str"
+            f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/toppar.str"
         )
         try:
             shutil.copytree(
-                f"{self.default_path}/toppar", f"{self.ligand_id}/complex/toppar"
-            )
-            shutil.copytree(
-                f"{self.default_path}/toppar", f"{self.ligand_id}/waterbox/toppar"
+                f"{self.default_path}/toppar", f"{self.ligand_id}/{self.env}/toppar"
             )
         except:
             print(f"Toppar directory is already available")
 
-        # manipulate toppar.str file
-        file = open(f"{self.ligand_id}/waterbox/toppar.str", "a")
-        file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
-        file.close()
-        file = open(f"{self.ligand_id}/complex/toppar.str", "a")
-        file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
-        file.close()
+    def modifyStep1(self, segids):
 
-    def copyINPfiles(self):
-        for file in glob.glob(f"{self.default_path}/*.inp"):
-            shutil.copy(file, f"{self.ligand_id}/waterbox/")
-            shutil.copy(file, f"{self.ligand_id}/complex/")
-
-    def prepareStep1(self, segids, env):
+        self._manipulateToppar()
 
         correction_on = False
 
-        fout = open(f"{self.ligand_id}/{env}/step1_pdbreader_tmp.inp", "wt")
-        with open(f"{self.ligand_id}/{env}/step1_pdbreader.inp", "r+") as f:
+        fout = open(f"{self.ligand_id}/{self.env}/step1_pdbreader_tmp.inp", "wt")
+        with open(f"{self.ligand_id}/{self.env}/step1_pdbreader.inp", "r+") as f:
             for line in f:
                 if line.startswith("! Read PROA"):
                     correction_on = True
                     f.readline()
-                    string = CharmmFactory.createHeader(segids, env)
+                    string = CharmmFactory.createHeader(segids, self.env)
                     fout.write(f"{string} \n")
                 if line.startswith("!Print heavy atoms with "):
                     correction_on = False
@@ -488,5 +366,34 @@ class CharmmManipulation:
                     fout.write(line)
         fout.close()
 
-        shutil.copy(fout.name, f"{self.ligand_id}/{env}/step1_pdbreader.inp")
+        shutil.copy(fout.name, f"{self.ligand_id}/{self.env}/step1_pdbreader.inp")
         os.remove(fout.name)
+
+    def _runCHARMM(self, step, charmm_exe):
+        # We need to go to the specific directory to run CHARMM
+        os.chdir(f"{self.ligand_id}/{self.env}/")
+        output = subprocess.run(
+            [f"{charmm_exe}"] + ["-i"] + [f"{step}.inp"] + ["-o"] + [f"{step}.out"],
+            text=True,
+            capture_output=True,
+        )
+        os.chdir("../../")
+        if output.returncode:
+            print(
+                f"Something went wront in step1 please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
+            )
+            sys.exit
+        else:
+            print(f"CHARMM process finished for {step}")
+
+    def executeCHARMM(self, charmm_exe):
+
+        steps = [
+            "step1_pdbreader",
+            "step2.1_waterbox",
+            "step2.2_ions",
+            "step2_solvator",
+            "step3_pbcsetup",
+        ]
+        for step in steps:
+            self._runCHARMM(step, charmm_exe)
