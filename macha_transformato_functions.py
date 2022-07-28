@@ -286,21 +286,21 @@ class Preparation:
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
         pdb_file = pm.load_file(
-            f"{self.original_dir}/{self.ligand_id}.pdb"
+            pdb_file_orig, structure=True
         )  # TODO: That might be solved smarter
-        count = 0
+        lps = []
         for atom in pdb_file:
             if atom.name.startswith("LP"):
                 print(f"We will remove {atom}, {atom.idx} ")
-                pdb_file_orig.strip(f"@{atom.idx - count}")
-                count += 1
-                assert atom.element_name == "EP"
+                lps.append(atom.idx)
+        if lps:
+            pdb_file.strip(f"@{lps[0]+1}-{lps[-1]+1}")
 
-        return pdb_file_orig
+        return pdb_file
 
     def createCRDfiles(self):
 
-        pdb_file_orig = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+        pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
         pdb_file = self._remove_lp(pdb_file_orig)
         df = pdb_file.to_dataframe()
         segids = set(i.residue.chain for i in pdb_file)
