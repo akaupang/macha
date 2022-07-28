@@ -6,15 +6,15 @@ Created on Mon Jul 25 12:03:58 2022
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
 
-from macha_transformato_functions import check_ligands, Preparation, CharmmManipulation
+from functions import check_ligands, Preparation, CharmmManipulation
 
 ################################################################################
 ### VARIABLES/SETTINGS
 ################################################################################
 
 parent_dir = "."
-original_dir = "original"
-ligands_dir = "ligands"
+original_dir = "../data/original"
+ligands_dir = "../ligands"
 input_ext = "pdb"  # for testing - should be pdb
 cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 

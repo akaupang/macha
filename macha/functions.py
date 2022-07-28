@@ -17,6 +17,9 @@ from charmm_factory import CharmmFactory
 
 def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
 
+    if not os.path.isdir(original_dir):
+        sys.exit(f"Input file {original_dir} not found!")
+    
     try:
         ligand_id = sys.argv[1]
         # Check for existence of ligands/"ligandid"
@@ -318,7 +321,7 @@ class CharmmManipulation:
         self.parent_dir: str = parent_dir
         self.ligand_id: str = ligand_id
         self.original_dir: str = original_dir
-        self.default_path: str = f"{self.parent_dir}/templates/default/"
+        self.default_path: str = f"{self.parent_dir}/../data/templates/default/"
         self.resname: str = resname
         self.env: str = env
 
