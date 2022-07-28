@@ -293,8 +293,8 @@ class Preparation:
             if atom.name.startswith("LP"):
                 print(f"We will remove {atom}, {atom.idx} ")
                 lps.append(atom.idx)
-        if lps:
-            pdb_file.strip(f"@{lps[0]+1}-{lps[-1]+1}")
+        for i in range(len(lps)):
+            pdb_file.strip(f"@{lps[i]+1-i}")
 
         return pdb_file
 
