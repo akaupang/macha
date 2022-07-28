@@ -150,7 +150,6 @@ def inputFileInserter(inpfile, cases, blocks, inversions):
 
 
 class Preparation:
-
     def __init__(self, parent_dir, ligand_id, original_dir):
         self.parent_dir = parent_dir
         self.ligand_id = ligand_id
@@ -176,7 +175,6 @@ class Preparation:
             f"Creating folders in {self.parent_dir}/{self.ligand_id} for complex and waterbox"
         )
 
-
     def _create_mol2_file(self):
 
         print(f"Converting the residue pdb file to a mol2 file")
@@ -184,32 +182,43 @@ class Preparation:
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
         mol = openbabel.OBMol()
-        obConversion.ReadFile(mol, f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb")
-        #mol.AddHydrogens() TODO: Do we need this?
+        obConversion.ReadFile(
+            mol,
+            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.pdb",
+        )
+        # mol.AddHydrogens() TODO: Do we need this?
 
         assert (mol.NumResidues()) == 1
-        obConversion.WriteFile(mol,f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2")
-        
+        obConversion.WriteFile(
+            mol,
+            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.mol2",
+        )
+
     def _modify_resname_in_str(self):
-        
-        fin = open(f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str", "rt")
-        fout = open(f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}_tmp.str", "wt")
+
+        fin = open(
+            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}.str",
+            "rt",
+        )
+        fout = open(
+            f"{self.ligand_id}/waterbox/{self.resname.upper()}/{self.resname.lower()}_tmp.str",
+            "wt",
+        )
         for line in fin:
             if line.startswith("RESI"):
-                fout.write(line.replace(line.split()[1], 'UNK'))
+                fout.write(line.replace(line.split()[1], "UNK"))
             else:
                 fout.write(line)
 
         fin.close()
         fout.close()
 
-        shutil.copy(fout.name,fin.name)
-    
+        shutil.copy(fout.name, fin.name)
+
     def copyREStocomplex(self):
 
         for file in glob.glob(f"{self.ligand_id}/waterbox/{self.resname.upper()}/*"):
             shutil.copy(file, f"{self.ligand_id}/complex/{self.resname.upper()}/")
-
 
     def getTopparFromLocalCGenFF(
         self,
@@ -268,27 +277,30 @@ class Preparation:
                 print(f"CGenFF executed successfully")
                 # print(cgenff_output.stdout)
                 # print(cgenff_output.stderr)
-        
+
         self._modify_resname_in_str()
 
         return cgenff_output
-    
+
     def _remove_lp(self, pdb_file_orig):
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
-        pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb") # TODO: That might be solved smarter 
-
+        pdb_file = pm.load_file(
+            f"{self.original_dir}/{self.ligand_id}.pdb"
+        )  # TODO: That might be solved smarter
+        count = 0
         for atom in pdb_file:
-            if atom.name.startswith('LP'):
-                print(f'We will remove {atom}')
-                pdb_file_orig.strip(f'@ {atom.idx}')
-                assert atom.element_name == 'EP'
+            if atom.name.startswith("LP"):
+                print(f"We will remove {atom}, {atom.idx} ")
+                pdb_file_orig.strip(f"@{atom.idx - count}")
+                count += 1
+                assert atom.element_name == "EP"
 
         return pdb_file_orig
-    
+
     def createCRDfiles(self):
 
-        pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+        pdb_file_orig = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
         pdb_file = self._remove_lp(pdb_file_orig)
         df = pdb_file.to_dataframe()
         segids = set(i.residue.chain for i in pdb_file)
@@ -332,7 +344,9 @@ class Preparation:
                         self.resname = i.residue.name
                     else:
                         if i.residue.name == "HIS":
-                            i.residue.name = "HSD" # ATTENTION!! Here we make all HIS to HSD
+                            i.residue.name = (
+                                "HSD"  # ATTENTION!! Here we make all HIS to HSD
+                            )
                             i.residue.chain = f"PRO{chain}"
                         i.residue.chain = f"PRO{chain}"
 
@@ -405,15 +419,14 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                             overwrite=True,
                         )
-        
-        # resname should be a 3 or 4 letters code                
+
+        # resname should be a 3 or 4 letters code
         assert len(self.resname) < 5
 
         return segids
 
 
-class CharmmManipulation():
-    
+class CharmmManipulation:
     def __init__(self, parent_dir, ligand_id, original_dir):
 
         self.parent_dir = parent_dir
@@ -423,33 +436,41 @@ class CharmmManipulation():
         self.resname: str = None
 
     def manipulateToppar(self, resname):
-        
+
         self.resname = resname
-        shutil.copy(f"{self.default_path}/toppar.str", f"{self.ligand_id}/waterbox/toppar.str")
-        shutil.copy(f"{self.default_path}/toppar.str", f"{self.ligand_id}/complex/toppar.str")
+        shutil.copy(
+            f"{self.default_path}/toppar.str", f"{self.ligand_id}/waterbox/toppar.str"
+        )
+        shutil.copy(
+            f"{self.default_path}/toppar.str", f"{self.ligand_id}/complex/toppar.str"
+        )
         try:
-            shutil.copytree(f"{self.default_path}/toppar", f"{self.ligand_id}/complex/toppar")
-            shutil.copytree(f"{self.default_path}/toppar", f"{self.ligand_id}/waterbox/toppar")                  
+            shutil.copytree(
+                f"{self.default_path}/toppar", f"{self.ligand_id}/complex/toppar"
+            )
+            shutil.copytree(
+                f"{self.default_path}/toppar", f"{self.ligand_id}/waterbox/toppar"
+            )
         except:
             print(f"Toppar directory is already available")
 
         # manipulate toppar.str file
-        file = open(f"{self.ligand_id}/waterbox/toppar.str","a")
+        file = open(f"{self.ligand_id}/waterbox/toppar.str", "a")
         file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
         file.close()
-        file = open(f"{self.ligand_id}/complex/toppar.str","a")
+        file = open(f"{self.ligand_id}/complex/toppar.str", "a")
         file.write(f"stream {self.resname.upper()}/{self.resname.lower()}.str")
         file.close()
 
     def copyINPfiles(self):
         for file in glob.glob(f"{self.default_path}/*.inp"):
             shutil.copy(file, f"{self.ligand_id}/waterbox/")
-            shutil.copy(file, f"{self.ligand_id}/complex/")        
+            shutil.copy(file, f"{self.ligand_id}/complex/")
 
     def prepareStep1(self, segids, env):
 
         correction_on = False
-       
+
         fout = open(f"{self.ligand_id}/{env}/step1_pdbreader_tmp.inp", "wt")
         with open(f"{self.ligand_id}/{env}/step1_pdbreader.inp", "r+") as f:
             for line in f:
@@ -457,10 +478,10 @@ class CharmmManipulation():
                     correction_on = True
                     f.readline()
                     string = CharmmFactory.createHeader(segids, env)
-                    fout.write(f'{string} \n')
+                    fout.write(f"{string} \n")
                 if line.startswith("!Print heavy atoms with "):
                     correction_on = False
-                    
+
                 if correction_on == True:
                     pass
                 else:
@@ -469,4 +490,3 @@ class CharmmManipulation():
 
         shutil.copy(fout.name, f"{self.ligand_id}/{env}/step1_pdbreader.inp")
         os.remove(fout.name)
-
