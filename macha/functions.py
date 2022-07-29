@@ -398,7 +398,7 @@ class CharmmManipulation:
         os.chdir("../../")
         if output.returncode:
             print(
-                f"Something went wront in step1 please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
+                f"Something went wrong in step1 please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
             )
             sys.exit
         else:
