@@ -1,0 +1,17 @@
+{% set version = "1.1.0" %}
+
+package:
+  name: macha
+  version: 0.1
+
+source:
+  path: macha
+  
+requirements:
+  build:
+    - python
+    - setuptools
+  run:
+    - python
+    - setuptools
+
