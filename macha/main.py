@@ -31,7 +31,7 @@ for ligand_id in ligand_ids:
 
     print(f"Processing ligand {ligand_id}")
 
-    for env in ["complex", "waterbox"]:
+    for env in ["waterbox", "complex"]:
         preparation = Preparation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,

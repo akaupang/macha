@@ -75,6 +75,7 @@ class Preparation:
 
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
+        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
 
     def _create_mol2_file(self):
 
@@ -327,18 +328,32 @@ class CharmmManipulation:
 
     def _manipulateToppar(self):
 
-        # manipulate toppar.str file
+        # manipulate toppar_charmm.str file
         file = open(f"{self.ligand_id}/{self.env}/toppar.str", "a")
         file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
+        file.close()
+        # manipulate toppar.str file for use with openmm
+        file = open(f"{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
+        file.write(f"stream ../{self.resname.lower()}/{self.resname.lower()}.str")
         file.close()
 
     def copyFiles(self):
 
+        # copy CHARMM related files
         for file in glob.glob(f"{self.default_path}/[!toppar]*"):
             shutil.copy(file, f"{self.ligand_id}/{self.env}/")
+
         shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/toppar.str"
+            f"{self.default_path}/toppar_charmm.str", f"{self.ligand_id}/{self.env}/toppar.str"
         )
+        shutil.copy(
+            f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/openmm/toppar.str"
+        )
+
+        # copy files for OpenMM
+        for file in glob.glob(f"{self.default_path}/*py"):
+            shutil.copy(file, f"{self.ligand_id}/{self.env}/openmm/")
+
         try:
             shutil.copytree(
                 f"{self.default_path}/toppar", f"{self.ligand_id}/{self.env}/toppar"
@@ -396,7 +411,7 @@ class CharmmManipulation:
             "step2.1_waterbox",
             "step2.2_ions",
             "step2_solvator",
-            "step3_pbcsetup",
+            "step3_pbcsetup_mod",
         ]
         for step in steps:
             self._runCHARMM(step, charmm_exe)
