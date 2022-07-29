@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import parmed as pm
 from openbabel import openbabel
-from charmm_factory import CharmmFactory
+# from charmm_factory import CharmmFactory
 
 def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
 

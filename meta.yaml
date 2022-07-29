@@ -1,0 +1,23 @@
+package:
+  name: macha
+  version: 0.1
+
+source:
+  git_rev: https://github.com/akaupang/macha/releases
+  git_url: https://github.com/akaupang/macha/tree/dev_johannes
+
+requirements:
+  build:
+    - python
+    - setuptools
+
+  run:
+    - python
+
+test:
+  imports:
+    -parmed
+    -openbabel
+
+about:
+  home: https://github.com/akaupang/macha
