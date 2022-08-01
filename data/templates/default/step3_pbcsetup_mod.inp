@@ -81,6 +81,28 @@ write coor unit 10 pdb
 open write unit 10 card name step3_pbcsetup.crd
 write coor unit 10 card
 
+!
+! Translate coordinates to work with openMM and save them in the openmm folder
+!
+
+coor stat
+calc xr = -1*?XMIN
+calc yr = -1*?YMIN
+calc zr = -1*?ZMIN
+
+coor tran xdir @XR ydir @YR zdir @ZR
+
+! Write out PSF, CRD and PDB 
+
+open write unit 10 card name openmm/step3_input.psf
+write  psf unit 10 card
+
+open write unit 10 card name openmm/step3_input.pdb
+write coor unit 10 pdb  
+
+open write unit 10 card name openmm/step3_input.crd
+write coor unit 10 card
+
 open  write unit 90 card name step3_pbcsetup.str
 write title unit 90
 * set BoxType  = @BoxType
@@ -98,17 +120,6 @@ write title unit 90
 * set ycen  = @ycen
 * set zcen  = @zcen
 *
-
-!
-! Translate coordinates to work with openMM and save them in the openmm folder
-!
-
-coor stat
-calc xr = -1*?XMIN
-calc yr = -1*?YMIN
-calc zr = -1*?ZMIN
-
-coor tran xdir @XR ydir @YR zdir @ZR
 
 ! Positional restraints for equilibration                                       
 ! from CG step4_equilibration.inp                                               
@@ -172,16 +183,5 @@ calc scommidx = ?selatom - 1
 if @scommidx .GE. 0 echo @scommidx SC ! Avoids -1 SC if sele SC is empty        
 if @I .LT. @scnum goto sclist                                                   
 echu                                                                            
-
-! Write out PSF, CRD and PDB 
-
-open write unit 10 card name openmm/step3_input.psf
-write  psf unit 10 card
-
-open write unit 10 card name openmm/step3_input.pdb
-write coor unit 10 pdb  
-
-open write unit 10 card name openmm/step3_input.crd
-write coor unit 10 card
 
 stop
