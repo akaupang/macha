@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import parmed as pm
 from openbabel import openbabel
-# from charmm_factory import CharmmFactory
+from charmm_factory import CharmmFactory
 
 def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
 
@@ -398,7 +398,7 @@ class CharmmManipulation:
         os.chdir("../../")
         if output.returncode:
             print(
-                f"Something went wrong in step1 please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
+                f"Something went wrong, please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
             )
             sys.exit
         else:
