@@ -175,13 +175,13 @@ echu
 
 ! Write out PSF, CRD and PDB 
 
-open write unit 10 card name openmm/step3_pbcsetup.psf
+open write unit 10 card name openmm/step3_input.psf
 write  psf unit 10 card
 
-open write unit 10 card name openmm/step3_pbcsetup.pdb
+open write unit 10 card name openmm/step3_input.pdb
 write coor unit 10 pdb  
 
-open write unit 10 card name openmm/step3_pbcsetup.crd
+open write unit 10 card name openmm/step3_input.crd
 write coor unit 10 card
 
 stop
