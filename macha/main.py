@@ -61,3 +61,4 @@ for ligand_id in ligand_ids:
         charmmManipulation.modifyStep1(segids)
         # Run Charmm giving the correct executable path
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        charmmManipulation.applyHMR()

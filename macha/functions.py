@@ -15,6 +15,9 @@ import parmed as pm
 from openbabel import openbabel
 from charmm_factory import CharmmFactory
 
+import warnings
+warnings.filterwarnings("ignore", module="parmed")
+
 def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
 
     if not os.path.isdir(original_dir):
@@ -76,6 +79,7 @@ class Preparation:
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
         self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
+        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/")
 
     def _create_mol2_file(self):
 
@@ -415,3 +419,44 @@ class CharmmManipulation:
         ]
         for step in steps:
             self._runCHARMM(step, charmm_exe)
+
+    def applyHMR(self):
+
+        if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+
+            parms = ()
+            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                parms += ( file, )
+
+            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+            params = pm.charmm.CharmmParameterSet(*parms)
+
+            shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
+            psf.load_parameters(params)
+            pm.tools.actions.HMassRepartition(psf).execute()
+            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+
+            # assure that mass is greater than one
+            for atom in psf:
+                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                    assert atom.mass > 1.5
+        else:
+            
+            parms = ()
+            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                parms += ( file, )
+
+            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+            params = pm.charmm.CharmmParameterSet(*parms)
+
+            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+            psf.load_parameters(params)
+            pm.tools.actions.HMassRepartition(psf).execute()
+            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+
+            # assure that mass is greater than one
+            for atom in psf:
+                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                    assert atom.mass > 1.5
+
