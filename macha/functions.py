@@ -83,7 +83,7 @@ class Preparation:
 
     def _create_mol2_file(self):
 
-        print(f"Converting the residue pdb file to a mol2 file")
+        print(f"Converting the residue pdb file to a mol2 and sdf file")
 
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
@@ -98,6 +98,10 @@ class Preparation:
         obConversion.WriteFile(
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
+        )
+        obConversion.WriteFile(
+            mol,
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
         )
 
     def _modify_resname_in_str(self):
