@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import parmed as pm
 from openbabel import openbabel
-from charmm_factory import CharmmFactory
+from .charmm_factory import CharmmFactory
 
 import warnings
 warnings.filterwarnings("ignore", module="parmed")
@@ -322,7 +322,7 @@ class Preparation:
 
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir, resname, env):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, default_path=f"../data/templates/default/"):
         """
         CHARMM related files like the toppar file are modified, later the CHARMM executable is
         executed
@@ -330,7 +330,7 @@ class CharmmManipulation:
         self.parent_dir: str = parent_dir
         self.ligand_id: str = ligand_id
         self.original_dir: str = original_dir
-        self.default_path: str = f"{self.parent_dir}/../data/templates/default/"
+        self.default_path: str = default_path
         self.resname: str = resname
         self.env: str = env
 
