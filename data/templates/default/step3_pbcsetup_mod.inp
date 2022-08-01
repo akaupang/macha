@@ -110,6 +110,71 @@ calc zr = -1*?ZMIN
 
 coor tran xdir @XR ydir @YR zdir @ZR
 
+! Positional restraints for equilibration                                       
+! from CG step4_equilibration.inp                                               
+!
+! MAY NEED MODIFICATION TO COVER THE ACTUAL SYSTEM                              
+!
+! Define BB and SC (and likely more in other systems)                           
+! BB contains:                                                                  
+! - selected heavy atoms, apparently the backbone of the protein (PROT)         
+!   notably not; OT1,OT2,                                                       
+! - selected heavy atoms in sugars (CARB) [complicated by "bonded" - pyranose?] 
+! - all non-hydrogens in ligands or metals (HETE)                               
+!                                                                               
+! SC contains those heavy atoms not selected in BB, from PROT and CARB, notably:
+! - side chain heavy atoms                                                      
+                                                                                
+define PROT sele ( segid PROA ) end                                             
+define CARB sele none end                                                       
+define HETE sele ( segid HET* ) end                                             
+                                                                                
+define BB   sele ( ( type C   .or. type O   .or. -                              
+                     type N   .or. type CA  .or. -                              
+                     type P   .or. type O1P .or. -                              
+                     type O2P .or. type O5' .or. -                              
+                     type C5' .or. type C4' .or. -                              
+                     type C3' .or. type O3' ) .and. PROT ) .or. -               
+                 ( ( type C+ .or. ( type O5 .and. .bonded. type C1 ) .or. -     
+                   ( type O6 .and. .bonded. type C2 ) ) .and. CARB ) .or. -     
+                 ( .not. hydrogen .and. HETE ) end                              
+                                                                                
+define SC   sele .not. BB .and. .not. hydrogen .and. ( PROT .or. CARB ) end     
+                                                                                
+! The following lines are kept for documenting the default restraints           
+!cons harm force 1.0 sele BB end                                                
+!cons harm force 0.1 sele SC end                                                
+                                                                                
+! Open output file and write the indexes of the selected residues iteratively   
+! The loop structure is based on the CHARMM docs, and uses the selection        
+! option .subset.                                                               
+                                                                                
+open write form name openmm/restraints/prot_pos.txt unit 30                     
+echu 30                                                                         
+                                                                                
+define BB sele BB end                                                           
+set bbnum ?nsel                                                                 
+set I 0                                                                         
+label bblist                                                                    
+increment I by 1                                                                
+define bbcur sele BB .subset. @I end                                            
+calc bbommidx = ?selatom - 1                                                    
+if @bbommidx .GE. 0 echo @bbommidx BB ! Avoids -1 BB if sele BB is empty        
+if @I .LT. @bbnum goto bblist                                                   
+                                                                                
+define SC sele SC end                                                           
+set scnum ?nsel                                                                 
+set I 0                                                                         
+label sclist                                                                    
+increment I by 1                                                                
+define sccur sele SC .subset. @I end                                            
+calc scommidx = ?selatom - 1                                                    
+if @scommidx .GE. 0 echo @scommidx SC ! Avoids -1 SC if sele SC is empty        
+if @I .LT. @scnum goto sclist                                                   
+echu                                                                            
+
+! Write out PSF, CRD and PDB 
+
 open write unit 10 card name openmm/step3_pbcsetup.psf
 write  psf unit 10 card
 
