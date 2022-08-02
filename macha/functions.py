@@ -64,6 +64,27 @@ class Preparation:
         self.resname = str
         self.env: str = env
 
+    def createUniqueAtomName(self):
+
+        pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+
+        ele_count = {}
+        for atom in pdb_file:
+            ele = atom.element_name
+            try:
+                ele_count[ele] += 1
+                atom.name = ele+str(ele_count[ele])
+            except KeyError:
+                ele_count[ele] = 0
+
+        pdb_file.save(
+            f"{self.original_dir}/{self.ligand_id}.pdb",
+            overwrite=True,
+        )
+
+        print(f'We will create a new pdb file with unique atom names! Use this with caution!!')
+
+
     def makeFolder(self, path):
 
         try:
@@ -116,7 +137,7 @@ class Preparation:
         )
         for line in fin:
             if line.startswith("RESI"):
-                fout.write(line.replace(line.split()[1], "UNK"))
+                fout.write(line.replace(line.split()[1], self.resname))
             else:
                 fout.write(line)
 
@@ -286,6 +307,13 @@ class Preparation:
         else:  # CHARMM-GUI generated pdb files
             print(f"Processing a CHARMM-GUI based pdb file")
             segids = set(i.residue.segid for i in pdb_file)
+
+            if len(segids) < 3:  # if there is segids available, we will assume,it is only ONE ligand!!
+                segids = ['HETA']
+                for atom in pdb_file:
+                    atom.residue.segid = "HETA"
+                df = pdb_file.to_dataframe()
+
             for segid in segids:
                 if segid not in ["SOLV", "IONS"]:
                     if segid == "HETA":
