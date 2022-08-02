@@ -384,7 +384,7 @@ class CharmmManipulation:
     def copyFiles(self):
 
         # copy CHARMM related files
-        for file in glob.glob(f"{self.default_path}/[!toppar][!__pycache__]*"):
+        for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.ligand_id}/{self.env}/")
 
         shutil.copy(
@@ -393,9 +393,12 @@ class CharmmManipulation:
         shutil.copy(
             f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/openmm/toppar.str"
         )
+        shutil.copy(
+            f"{self.default_path}/checkfft.py", f"{self.ligand_id}/{self.env}/checkfft.py"
+        )
 
         # copy files for OpenMM
-        for file in glob.glob(f"{self.default_path}/*py"):
+        for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
             shutil.copy(file, f"{self.ligand_id}/{self.env}/openmm/")
 
         try:
