@@ -13,7 +13,7 @@ from functions import check_ligands, Preparation, CharmmManipulation
 ################################################################################
 
 parent_dir = "."
-original_dir = "../data/original"
+original_dir = "data/original"
 ligands_dir = "../ligands"
 input_ext = "pdb"  # for testing - should be pdb
 cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"

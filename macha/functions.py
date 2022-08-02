@@ -322,7 +322,7 @@ class Preparation:
 
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, default_path=f"../data/templates/default/"):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, default_path=""):
         """
         CHARMM related files like the toppar file are modified, later the CHARMM executable is
         executed
@@ -330,9 +330,17 @@ class CharmmManipulation:
         self.parent_dir: str = parent_dir
         self.ligand_id: str = ligand_id
         self.original_dir: str = original_dir
-        self.default_path: str = default_path
         self.resname: str = resname
         self.env: str = env
+        if not default_path:
+            self.default_path: str = self.get_default_path()
+        else:
+            self.default_path = default_path
+
+    def get_default_path(self):
+        
+        import macha
+        return f"{macha.__path__[0]}/data/templates/default/"
 
     def _manipulateToppar(self):
 
@@ -348,7 +356,7 @@ class CharmmManipulation:
     def copyFiles(self):
 
         # copy CHARMM related files
-        for file in glob.glob(f"{self.default_path}/[!toppar]*"):
+        for file in glob.glob(f"{self.default_path}/[!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.ligand_id}/{self.env}/")
 
         shutil.copy(
