@@ -120,6 +120,12 @@ class Preparation:
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
         )
+        obConversion.SetInAndOutFormats("pdb", "sdf")
+        mol = openbabel.OBMol()
+        obConversion.ReadFile(
+            mol,
+            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+        )
         obConversion.WriteFile(
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
