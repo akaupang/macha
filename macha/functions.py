@@ -233,9 +233,9 @@ class Preparation:
         pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
         pdb_file = self._remove_lp(pdb_file_orig)
         df = pdb_file.to_dataframe()
-        segids = set(i.residue.chain for i in pdb_file)
+        segids = set(i.residue.segid for i in pdb_file)
         if (
-            len(segids) > 1
+            len(segids) < 1
         ):  # for pdb file created with MAESTRO containing the chaing segment
             print(f"Processing a Maestro based pdb file")
             aa = [
@@ -260,9 +260,10 @@ class Preparation:
                 "TRP",
                 "TYR",
                 "VAL",
-                "HSD",
-                "HSE",
-            ]  # we need to finde the residue of the ligand which should be the only one beeing not an aa
+                "HID",
+                "HIE",
+                "HIP",
+            ]  # we need to find the residue of the ligand which should be the only one being not an aa
             for (
                 chain
             ) in (
@@ -287,7 +288,7 @@ class Preparation:
             df = pdb_file.to_dataframe()
             segids = set(i.residue.chain for i in pdb_file)
             for segid in segids:  # now we can save the crd files
-                if segid not in ["SOLV", "IONS"]:
+                if segid not in ["SOLV", "IONS","WATA"]:
                     if segid == "HETA":
                         pdb_file[df.chain == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
@@ -314,15 +315,18 @@ class Preparation:
             print(f"Processing a CHARMM-GUI based pdb file")
             segids = set(i.residue.segid for i in pdb_file)
 
-            if len(segids) < 3:  # if there is segids available, we will assume,it is only ONE ligand!!
+            if len(segids) == 1:  # This case applies to an input PDB containing ONLY the ligand.
                 segids = ['HETA']
                 for atom in pdb_file:
                     atom.residue.segid = "HETA"
+
+                # Update the dataframe with the new segid
                 df = pdb_file.to_dataframe()
 
             for segid in segids:
-                if segid not in ["SOLV", "IONS"]:
+                if segid not in ["SOLV", "IONS", "WATA", "WATB", "WATC"]:
                     if segid == "HETA":
+
                         self.resname = pdb_file[df.segid == f"{segid}"].residues[0].name
                         self.makeFolder(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
