@@ -13,7 +13,7 @@ from functions import check_ligands, Preparation, CharmmManipulation
 ################################################################################
 
 parent_dir = "."
-original_dir = "original"
+original_dir = "data/original"
 ligands_dir = "../ligands"
 input_ext = "pdb"  # for testing - should be pdb
 cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
@@ -60,5 +60,6 @@ for ligand_id in ligand_ids:
         # Modify step1_pdbreader.inp to read in correct amount of chains/residues
         charmmManipulation.modifyStep1(segids)
         # Run Charmm giving the correct executable path
-        charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        # charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        charmmManipulation.createOpenMMSystem()
         charmmManipulation.applyHMR()
