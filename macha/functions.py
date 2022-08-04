@@ -547,7 +547,7 @@ class CharmmManipulation:
                 gamma = line.split(' ')[-1].strip()  
 
         with open(f"{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
-            f.write('{"dimensions"}:['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
+            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
 
 
 
