@@ -481,41 +481,45 @@ class CharmmManipulation:
 
     def applyHMR(self):
 
-        if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+        try:
 
-            parms = ()
-            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                parms += ( file, )
+            if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
 
-            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-            params = pm.charmm.CharmmParameterSet(*parms)
+                parms = ()
+                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                    parms += ( file, )
 
-            shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
-            psf.load_parameters(params)
-            pm.tools.actions.HMassRepartition(psf).execute()
-            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                params = pm.charmm.CharmmParameterSet(*parms)
 
-            # assure that mass is greater than one
-            for atom in psf:
-                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                    assert atom.mass > 1.5
-        else:
-            
-            parms = ()
-            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                parms += ( file, )
+                shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
+                psf.load_parameters(params)
+                pm.tools.actions.HMassRepartition(psf).execute()
+                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
-            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-            params = pm.charmm.CharmmParameterSet(*parms)
+                # assure that mass is greater than one
+                for atom in psf:
+                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                        assert atom.mass > 1.5
+            else:
+                
+                parms = ()
+                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                    parms += ( file, )
 
-            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-            psf.load_parameters(params)
-            pm.tools.actions.HMassRepartition(psf).execute()
-            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                params = pm.charmm.CharmmParameterSet(*parms)
 
-            # assure that mass is greater than one
-            for atom in psf:
-                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                    assert atom.mass > 1.5
+                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                psf.load_parameters(params)
+                pm.tools.actions.HMassRepartition(psf).execute()
+                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+
+                # assure that mass is greater than one
+                for atom in psf:
+                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                        assert atom.mass > 1.5
+        except:
+            print("Masses were left unchanged! HMR not possible, check your output! ")
 
