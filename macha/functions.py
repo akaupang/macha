@@ -54,8 +54,8 @@ def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligan
 class Preparation:
     def __init__(self, parent_dir, ligand_id, original_dir, env):
         """
-        This class prepares everything for further use with CHARMM. The pdb files are sliced into pieces 
-        and the ligand is converted to a mol2 file.
+        This class prepares everything for further use with CHARMM. The PDB 
+        files are sliced into pieces and the ligand is converted to a mol2 file.
         A local version of CGenFF creates a stream file for the ligand.
         """
         self.parent_dir = parent_dir
@@ -64,12 +64,16 @@ class Preparation:
         self.resname = str
         self.env: str = env
 
-    def createUniqueAtomName(self):
+        # Load the PDB file into ParmEd
+        self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+        self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
 
-        pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+    def createUniqueAtomName(self): # UNUSED FUNCTION
+
+        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
 
         ele_count = {}
-        for atom in pdb_file:
+        for atom in self.pdb_file:
             ele = atom.element_name
             try:
                 ele_count[ele] += 1
@@ -77,7 +81,7 @@ class Preparation:
             except KeyError:
                 ele_count[ele] = 0
 
-        pdb_file.save(
+        self.pdb_file.save(
             f"{self.original_dir}/{self.ligand_id}.pdb",
             overwrite=True,
         )
@@ -85,7 +89,7 @@ class Preparation:
         print(f'We will create a new pdb file with unique atom names! Use this with caution!!')
 
 
-    def makeFolder(self, path):
+    def _make_folder(self, path):
 
         try:
             os.makedirs(path)
@@ -97,10 +101,10 @@ class Preparation:
 
     def makeTFFolderStructure(self):
 
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}")
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
-        self.makeFolder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/")
 
     def _create_mol2_file(self):
 
@@ -131,7 +135,7 @@ class Preparation:
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
         )
 
-    def _modify_resname_in_str(self):
+    def _modify_resname_in_stream(self):
 
         fin = open(
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
@@ -170,7 +174,9 @@ class Preparation:
                 print(
                     "Please install it in the active environment or point the routine"
                 )
-                print("to the right path using the key cgenff_path='/path/to/cgenff' .")
+                print(
+                    "to the right path using the key cgenff_path='/path/to/cgenff' ."
+                )
             else:
                 cgenff_bin = cgenff_path
         else:
@@ -179,7 +185,8 @@ class Preparation:
         # CGenFF exists - start program
         if cgenff_bin != None:
             
-            # remove str file otherwise cgenff will append the new one at the end
+            # Remove stream file otherwise CGenFF will append the new one at 
+            # the end of the old one
             stream_file = f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
             if os.path.isfile(stream_file):
                 os.remove(stream_file)
@@ -210,30 +217,41 @@ class Preparation:
                 # print(cgenff_output.stdout)
                 # print(cgenff_output.stderr)
 
-        self._modify_resname_in_str()
+        self._modify_resname_in_stream()
 
         return cgenff_output
 
-    def _remove_lp(self, pdb_file_orig):
+    def _remove_lp(self):
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
-        pdb_file = pm.load_file(pdb_file_orig, structure=True)
         lps = []
-        for atom in pdb_file:
-            if atom.name.startswith("LP"):
+        for atom in self.pdb_file:
+            if ((atom.name.startswith("LP")) or (atom.name.startswith("Lp"))):
                 print(f"We will remove {atom}, {atom.idx} ")
                 lps.append(atom.idx)
-        for i in range(len(lps)):
-            pdb_file.strip(f"@{lps[i]+1-i}")
 
-        return pdb_file
+        for i in range(len(lps)):
+            self.pdb_file.strip(f"@{lps[i]+1-i}")
+
+        return self.pdb_file
 
     def createCRDfiles(self):
+        
+        # Remove lone pairs
+        self.pdb_file = self._remove_lp()
+        
+        # Store the PDB as a dataframe for later use
+        df = self.pdb_file.to_dataframe()
 
-        pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
-        pdb_file = self._remove_lp(pdb_file_orig)
-        df = pdb_file.to_dataframe()
-        segids = set(i.residue.segid for i in pdb_file)
+        # We will cater for two types of PDB files
+        # 1: Canonical/MAESTRO-derived PDB files
+        # 2: CHARMM-derived PDB files
+        # This distinction is made by looking for segids and counting these.
+        # Canonical/MAESTRO-derived PDB files will be void of segids, while 
+        # CHARMM PDB files contain this column 
+        
+        # Count the segids in the PDB file (if any)
+        segids = set(i.residue.segid for i in self.pdb_file)
         if (
             len(segids) < 1
         ):  # for pdb file created with MAESTRO containing the chaing segment
@@ -269,7 +287,7 @@ class Preparation:
             ) in (
                 segids
             ):  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
-                for i in pdb_file.view[df.chain == f"{chain}"]:
+                for i in self.pdb_file.view[df.chain == f"{chain}"]:
                     if i.residue.name not in aa:
                         i.residue.chain = f"HETA"
                         self.resname = i.residue.name
@@ -281,30 +299,30 @@ class Preparation:
                             i.residue.chain = f"PRO{chain}"
                         i.residue.chain = f"PRO{chain}"
 
-            self.makeFolder(
+            self._make_folder(
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
             )
 
-            df = pdb_file.to_dataframe()
-            segids = set(i.residue.chain for i in pdb_file)
+            df = self.pdb_file.to_dataframe()
+            segids = set(i.residue.chain for i in self.pdb_file)
             for segid in segids:  # now we can save the crd files
                 if segid not in ["SOLV", "IONS","WATA"]:
                     if segid == "HETA":
-                        pdb_file[df.chain == f"{segid}"].save(
+                        self.pdb_file[df.chain == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        pdb_file[df.chain == f"{segid}"].save(
+                        self.pdb_file[df.chain == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
                     else:
                         try:
-                            pdb_file[df.chain == f"{segid}"].save(
+                            self.pdb_file[df.chain == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
                                 overwrite=True,
                             )
-                            pdb_file[df.chain == f"{segid}"].save(
+                            self.pdb_file[df.chain == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                                 overwrite=True,
                             )
@@ -313,40 +331,40 @@ class Preparation:
 
         else:  # CHARMM-GUI generated pdb files
             print(f"Processing a CHARMM-GUI based pdb file")
-            segids = set(i.residue.segid for i in pdb_file)
+            segids = set(i.residue.segid for i in self.pdb_file)
 
             if len(segids) == 1:  # This case applies to an input PDB containing ONLY the ligand.
                 segids = ['HETA']
-                for atom in pdb_file:
+                for atom in self.pdb_file:
                     atom.residue.segid = "HETA"
 
                 # Update the dataframe with the new segid
-                df = pdb_file.to_dataframe()
+                df = self.pdb_file.to_dataframe()
 
             for segid in segids:
                 if segid not in ["SOLV", "IONS", "WATA", "WATB", "WATC"]:
                     if segid == "HETA":
 
-                        self.resname = pdb_file[df.segid == f"{segid}"].residues[0].name
-                        self.makeFolder(
+                        self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                        self._make_folder(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
-                        pdb_file[df.segid == f"{segid}"].save(
+                        self.pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        pdb_file[df.segid == f"{segid}"].save(
+                        self.pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
 
                     else:
                         try:
-                            pdb_file[df.segid == f"{segid}"].save(
+                            self.pdb_file[df.segid == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
                                 overwrite=True,
                             )
-                            pdb_file[df.segid == f"{segid}"].save(
+                            self.pdb_file[df.segid == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                                 overwrite=True,
                             )

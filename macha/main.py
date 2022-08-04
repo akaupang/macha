@@ -32,6 +32,8 @@ for ligand_id in ligand_ids:
     print(f"Processing ligand {ligand_id}")
 
     for env in ["waterbox", "complex"]:
+        # Preparation of ligands
+        # Instantiate class
         preparation = Preparation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
@@ -39,14 +41,15 @@ for ligand_id in ligand_ids:
             env=env,
         )
 
-        # Make a Transformato style folder structure below a folder bearing
-        # the name of the ligand
+        # Make a Transformato style folder structure
         preparation.makeTFFolderStructure()
+        # Create CHARMM Coordinate files
         segids = preparation.createCRDfiles()
-
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
+        # Edit the CHARMM-GUI scripts
+        # Instantiate class
         charmmManipulation = CharmmManipulation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
