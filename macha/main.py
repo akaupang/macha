@@ -45,6 +45,8 @@ for ligand_id in ligand_ids:
         preparation.makeTFFolderStructure()
         # Create CHARMM Coordinate files
         segids = preparation.createCRDfiles()
+        print("The following segments were found/created:")
+        print(*segids)
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 

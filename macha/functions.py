@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import parmed as pm
 from openbabel import openbabel
+import string
 from .charmm_factory import CharmmFactory
 
 import warnings
@@ -70,7 +71,7 @@ class Preparation:
 
     def createUniqueAtomName(self): # UNUSED FUNCTION
 
-        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
+        #self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
 
         ele_count = {}
         for atom in self.pdb_file:
@@ -95,7 +96,7 @@ class Preparation:
             os.makedirs(path)
             print(f"Creating folder in {path} for the {self.env}")
         except OSError:
-            print(f"There exists a folder in {path} for {self.env} we will use it")
+            print(f"There exists a folder in {path} for {self.env} - we will use it")
             if not os.path.isdir(path):
                 raise
 
@@ -117,7 +118,13 @@ class Preparation:
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
-        # mol.AddHydrogens() TODO: Do we need this?
+        # mol.AddHydrogens() TODO: Do we need this? ÅK: since the user will 
+        # prepare (modified) ligands in any case, I'd rather see this function
+        # fail gracefully if explicit hydrogens are not all present.
+
+        #DEBUG
+        #with open(f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb", 'r') as hei:
+        #    print(hei.read())
 
         assert (mol.NumResidues()) == 1
         obConversion.WriteFile(
@@ -235,11 +242,127 @@ class Preparation:
 
         return self.pdb_file
 
+    def _check_ionizable(self):
+        # A preliminary list of residue names for titrable residues that indicate that the user has set them
+        # AMBER names will be converted to CHARMM names, no questions asked.
+        # TODO This list should be expanded to be comprehensive 
+        ionized_res = [
+            "HID",
+            "HIE",
+            "HIP",
+            "HSD",
+            "HSE",
+            "HSP",
+            "CYX",
+            "CYM",
+            "ASPP",
+            "GLUP",
+        ]
+            
+        for res in self.pdb_file.residues: # produce a select view of this chain using a boolean mask
+            if res.name in ionized_res:
+                # Harmonize to CHARMM names (from AMBER names)
+                # TODO This section should be expanded to be comprehensive
+                if res.name == "HID":
+                    res.name = "HSD"
+                elif res.name == "HIE":
+                    res.name = "HSE"
+                elif res.name == "HIP":
+                    res.name = "HSP"                        
+                elif res.name == "CYX":
+                    res.name = "CYM"                        
+                else:
+                    pass                        
+                        
+            elif res.name == "HIS":
+                # TODO A lookup using PROPKA or another solution could be of interest here
+                res.name = (
+                    "HSD"  # ATTENTION!! Here we make all HIS to HSD
+                )
+
+
+        return self.pdb_file
+
+    def _add_segids(self, df):
+        # This function adds segids to the Parmed object from a PDB that does
+        # not contain segids, but only chain ids, ensuring that segids can be
+        # used in making of crd files later.
+        # The function attempts to establish residue names that lie outside the
+        # range of "normal" amino acids names and will give these the name HETx
+        # in which x is the chain ID
+
+        # TODO This list should be expanded to be comprehensive
+        aa = [ 
+            "ALA",
+            "ARG",
+            "ASN",
+            "ASP",
+            "CYS",
+            "GLN",
+            "GLU",
+            "GLY",
+            "HIS",
+            "ILE",
+            "LEU",
+            "LYS",
+            "MET",
+            "PHE",
+            "PRO",
+            "SER",
+            "THR",
+            "TPO",
+            "TRP",
+            "TYR",
+            "VAL",
+            "HID",
+            "HIE",
+            "HIP",
+            "HSD",
+            "HSE",
+            "HSP",
+            "CYX",
+            "CYM",
+            "ASPP",
+            "GLUP"
+        ]  # we need to find the residue of the ligand which should be the only one being not an aa
+
+        exclude = [ #TODO Many more common crystallization additives should be added to this list
+            "1PE"
+        ]
+
+        #ions =[] #TODO A list of ions could be added
+
+        het_letters = list(string.ascii_uppercase)
+
+        # TODO Make this loop handle multiple ligands in one chain
+        chids = set(i.residue.chain for i in self.pdb_file)
+        for chain in chids:  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
+            for res in self.pdb_file.view[df.chain == f"{chain}"].residues: # produce a select view of this chain's residues using a boolean mask
+                resnum = res.number
+                if res.name in aa:
+                    res.segid = f"PRO{chain}"
+                elif res.name == "HOH":
+                    res.segid = f"WAT{chain}"
+                elif res.name in exclude:
+                    res.segid = f"CRST"
+                else:
+                    if resnum == prev_resnum:
+                        pass
+                    else:
+                        res.segid = f"HET{het_letters.pop(0)}"
+                    #self.resname = i.residue.name
+                prev_resnum = resnum
+        return self.pdb_file
+        
     def createCRDfiles(self):
         
-        # Remove lone pairs
+        # Remove lone pairs (if any)
         self.pdb_file = self._remove_lp()
         
+        # Check/rename ionizable residues (if the user has not set their protonation states)
+        # ATTENTION: All occurrences of HIS will become HSD
+        self.pdb_file = self._check_ionizable()
+
         # Store the PDB as a dataframe for later use
         df = self.pdb_file.to_dataframe()
 
@@ -247,129 +370,68 @@ class Preparation:
         # 1: Canonical/MAESTRO-derived PDB files
         # 2: CHARMM-derived PDB files
         # This distinction is made by looking for segids and counting these.
-        # Canonical/MAESTRO-derived PDB files will be void of segids, while 
-        # CHARMM PDB files contain this column 
+        # Canonical/MAESTRO-derived PDB files will be void of segids, but will
+        # have chain IDs, while CHARMM PDB files contain the segid column, but
+        # lack chain IDs. 
         
         # Count the segids in the PDB file (if any)
         segids = set(i.residue.segid for i in self.pdb_file)
-        if (
-            len(segids) < 1
-        ):  # for pdb file created with MAESTRO containing the chaing segment
-            print(f"Processing a Maestro based pdb file")
-            aa = [
-                "ALA",
-                "ARG",
-                "ASN",
-                "ASP",
-                "CYS",
-                "GLN",
-                "GLU",
-                "GLY",
-                "HIS",
-                "ILE",
-                "LEU",
-                "LYS",
-                "MET",
-                "PHE",
-                "PRO",
-                "SER",
-                "THR",
-                "TPO",
-                "TRP",
-                "TYR",
-                "VAL",
-                "HID",
-                "HIE",
-                "HIP",
-            ]  # we need to find the residue of the ligand which should be the only one being not an aa
-            for (
-                chain
-            ) in (
-                segids
-            ):  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
-                for i in self.pdb_file.view[df.chain == f"{chain}"]:
-                    if i.residue.name not in aa:
-                        i.residue.chain = f"HETA"
-                        self.resname = i.residue.name
-                    else:
-                        if i.residue.name == "HIS":
-                            i.residue.name = (
-                                "HSD"  # ATTENTION!! Here we make all HIS to HSD
-                            )
-                            i.residue.chain = f"PRO{chain}"
-                        i.residue.chain = f"PRO{chain}"
-
-            self._make_folder(
-                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
-            )
-
+        
+        # For canonical/MAESTRO-derived PDB files containing chain IDs
+        if segids == {''}: # empty set of segids
+            print(f"Processing a canonical/Maestro based pdb file (without segids)")
+          
+            # Add segids to the Parmed object
+            self.pdb_file = self._add_segids(df)
+            # Update the dataframe and segid list
             df = self.pdb_file.to_dataframe()
-            segids = set(i.residue.chain for i in self.pdb_file)
-            for segid in segids:  # now we can save the crd files
-                if segid not in ["SOLV", "IONS","WATA"]:
-                    if segid == "HETA":
-                        self.pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        self.pdb_file[df.chain == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                            overwrite=True,
-                        )
-                    else:
-                        try:
-                            self.pdb_file[df.chain == f"{segid}"].save(
-                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
-                                overwrite=True,
-                            )
-                            self.pdb_file[df.chain == f"{segid}"].save(
-                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
-                                overwrite=True,
-                            )
-                        except:
-                            pass
-
-        else:  # CHARMM-GUI generated pdb files
-            print(f"Processing a CHARMM-GUI based pdb file")
             segids = set(i.residue.segid for i in self.pdb_file)
 
-            if len(segids) == 1:  # This case applies to an input PDB containing ONLY the ligand.
-                segids = ['HETA']
-                for atom in self.pdb_file:
-                    atom.residue.segid = "HETA"
+        # For CHARMM-GUI generated PDB files
+        else:  
+            print(f"Processing a CHARMM PDB file (with segids)")
 
-                # Update the dataframe with the new segid
-                df = self.pdb_file.to_dataframe()
+    
+        #segids = set(i.residue.segid for i in self.pdb_file)
+        
+        # Evaluate the found/created segids and output coordinate files
+        # if len(segids) == 1:  # This case applies to an input PDB containing ONLY the ligand.
+        #     segids = ['HETA']
+        #     for atom in self.pdb_file:
+        #         atom.residue.segid = "HETA"
 
-            for segid in segids:
-                if segid not in ["SOLV", "IONS", "WATA", "WATB", "WATC"]:
-                    if segid == "HETA":
+        #     # Update the dataframe with the new segid
+        #     df = self.pdb_file.to_dataframe()
 
-                        self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
-                        self._make_folder(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
-                        )
+        for segid in segids:
+            if segid not in ["SOLV", "IONS", "WATA", "WATB", "WATC", "CRST", "HETB", "HETC"]:# multiple ligands are excluded for now
+                if segid == "HETA":
+
+                    self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                    self._make_folder(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
+                    )
+                    self.pdb_file[df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                        overwrite=True,
+                    )
+                    self.pdb_file[df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                        overwrite=True,
+                    )
+
+                else:
+                    try:
                         self.pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         self.pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
                             overwrite=True,
                         )
-
-                    else:
-                        try:
-                            self.pdb_file[df.segid == f"{segid}"].save(
-                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
-                                overwrite=True,
-                            )
-                            self.pdb_file[df.segid == f"{segid}"].save(
-                                f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
-                                overwrite=True,
-                            )
-                        except:
-                            pass
+                    except:
+                        pass
 
         # resname should be a 3 or 4 letters code
         assert len(self.resname) < 5
