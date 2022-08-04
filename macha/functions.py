@@ -404,6 +404,12 @@ class CharmmManipulation:
             f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/openmm/toppar.str"
         )
         shutil.copy(
+            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
+        )
+        shutil.copy(
+            f"{self.default_path}/omm_step5_production.inp", f"{self.ligand_id}/{self.env}/openmm/step5_production.inp"
+        )
+        shutil.copy(
             f"{self.default_path}/checkfft.py", f"{self.ligand_id}/{self.env}/checkfft.py"
         )
 
