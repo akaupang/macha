@@ -4,11 +4,10 @@ channels:
   - defaults
 dependencies:
   # Base depends
-  - parmed
   - openbabel
     # Testing
   - pytest
   - pytest-cov
   - codecov
   - pip:
-    - git+https://github.com/ParmEd/ParmEd.git
+    - git+https://github.com/ParmEd/ParmEd.git # Version which should support LPs
