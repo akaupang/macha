@@ -359,6 +359,10 @@ class Preparation:
         for chain in chids:  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
             # DEBUG
             #print(f"Working on chain {chain}.")
+
+            # Set a temporary previous residue number
+            prev_resnum = -1
+            
             for res in self.pdb_file.view[df.chain == f"{chain}"].residues: # produce a select view of this chain's residues using a boolean mask
                 resnum = res.number
                 if res.name in aa_res:
@@ -374,12 +378,7 @@ class Preparation:
                         res.segid = f"HET{het_letters.pop(0)}"
                     #self.resname = i.residue.name
                 prev_resnum = resnum
-
-            # The residue number needs to be set here in some cases if the
-            # ligand is not the same chain ID as the protein (observed in 
-            # Maestro PDBs). -1 is used since 0 is sometimes observed as the
-            # first residue number.
-            resnum = -1
+         
 
         return self.pdb_file
         
