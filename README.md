@@ -1,3 +1,7 @@
+[//]: # (Badges)
+[![GitHub Actions Build Status](https://github.com/akaupang/macha/workflows/CI/badge.svg)](https://github.com/akaupang/macha/actions)
+
+
 
 ### maNUAL chaRMM
 
