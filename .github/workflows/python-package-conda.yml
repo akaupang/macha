@@ -68,7 +68,7 @@ jobs:
         pytest -v --cov=macha --cov-report=xml --color=yes macha/tests/
 
     - name: CodeCov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3.1.0
       with:
         file: ./coverage.xml
         flags: unittests
