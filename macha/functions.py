@@ -64,6 +64,7 @@ class Preparation:
         self.original_dir = original_dir
         self.resname = str
         self.env: str = env
+        self.input_type = None
 
         # Load the PDB file into ParmEd
         self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
@@ -118,9 +119,15 @@ class Preparation:
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
-        # mol.AddHydrogens() TODO: Do we need this? ÅK: since the user will 
+        if self.input_type == "hydrogens":
+            pass
+        elif self.input_type == "nohydrogens":
+            mol.AddHydrogens() #TODO: Do we need this? ÅK: since the user will 
         # prepare (modified) ligands in any case, I'd rather see this function
-        # fail gracefully if explicit hydrogens are not all present.
+        # fail gracefully if explicit hydrogens are not all present. 
+        # UPDATE - it seems to be needed for mol2 files made from pdb slices,
+        # that are producing when a raw x-ray-derived PDB file (no hydrogens)
+        # is used as an input file.
 
         #DEBUG
         #with open(f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb", 'r') as hei:
@@ -172,6 +179,7 @@ class Preparation:
 
         # CGenFF needs a mol2 file as input file
         self._create_mol2_file()
+
 
         # If no particular path is given, check whether CGenFF is available
         if cgenff_path == False:
@@ -283,6 +291,14 @@ class Preparation:
 
         return self.pdb_file
 
+    def _check_for_hydrogens(self):
+        if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
+            self.input_type = "hydrogens"
+            print("Hydrogens are present")
+        else:
+            self.input_type = "nohydrogens"
+            print("No hydrogens are present")
+
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
         # not contain segids, but only chain ids, ensuring that segids can be
@@ -292,7 +308,7 @@ class Preparation:
         # in which x is the chain ID
 
         # TODO This list should be expanded to be comprehensive
-        aa = [ 
+        aa_res = [ 
             "ALA",
             "ARG",
             "ASN",
@@ -326,24 +342,29 @@ class Preparation:
             "GLUP"
         ]  # we need to find the residue of the ligand which should be the only one being not an aa
 
-        exclude = [ #TODO Many more common crystallization additives should be added to this list
+        exclude_res = [ #TODO Many more common crystallization additives should be added to this list
             "1PE"
         ]
 
-        #ions =[] #TODO A list of ions could be added
+        #ions_res =[] #TODO A list of ions could be added for their particular handling
 
+        # Make a list of ABCD... for use as x in HETx
         het_letters = list(string.ascii_uppercase)
 
         # TODO Make this loop handle multiple ligands in one chain
         chids = set(i.residue.chain for i in self.pdb_file)
+        # DEBUG
+        #print(f"Found chain IDs: {chids}")
         for chain in chids:  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
+            # DEBUG
+            #print(f"Working on chain {chain}.")
             for res in self.pdb_file.view[df.chain == f"{chain}"].residues: # produce a select view of this chain's residues using a boolean mask
                 resnum = res.number
-                if res.name in aa:
+                if res.name in aa_res:
                     res.segid = f"PRO{chain}"
                 elif res.name == "HOH":
                     res.segid = f"WAT{chain}"
-                elif res.name in exclude:
+                elif res.name in exclude_res:
                     res.segid = f"CRST"
                 else:
                     if resnum == prev_resnum:
@@ -352,6 +373,13 @@ class Preparation:
                         res.segid = f"HET{het_letters.pop(0)}"
                     #self.resname = i.residue.name
                 prev_resnum = resnum
+
+            # The residue number needs to be set here in some cases if the
+            # ligand is not the same chain ID as the protein (observed in 
+            # Maestro PDBs). -1 is used since 0 is sometimes observed as the
+            # first residue number.
+            resnum = -1
+
         return self.pdb_file
         
     def createCRDfiles(self):
@@ -380,7 +408,11 @@ class Preparation:
         # For canonical/MAESTRO-derived PDB files containing chain IDs
         if segids == {''}: # empty set of segids
             print(f"Processing a canonical/Maestro based pdb file (without segids)")
-          
+            
+            # Check for hydrogens
+            # set self.input_type
+            self._check_for_hydrogens()
+
             # Add segids to the Parmed object
             self.pdb_file = self._add_segids(df)
             # Update the dataframe and segid list
@@ -390,7 +422,9 @@ class Preparation:
         # For CHARMM-GUI generated PDB files
         else:  
             print(f"Processing a CHARMM PDB file (with segids)")
-
+            # Check for hydrogens
+            # set self.input_type
+            self._check_for_hydrogens()
     
         #segids = set(i.residue.segid for i in self.pdb_file)
         
@@ -402,41 +436,75 @@ class Preparation:
 
         #     # Update the dataframe with the new segid
         #     df = self.pdb_file.to_dataframe()
-
+        exclude_segids = ["SOLV", "IONS", "WATA", "WATB", "WATC", "CRST", "HETB", "HETC"]
+        used_segids = []
         for segid in segids:
-            if segid not in ["SOLV", "IONS", "WATA", "WATB", "WATC", "CRST", "HETB", "HETC"]:# multiple ligands are excluded for now
-                if segid == "HETA":
+            if segid not in exclude_segids:# multiple ligands are excluded for now
+                # Store in the segids to be given to CharmmManipulation
+                used_segids.append(segid)
+                
+                # WATERBOX ENVIRONMENT
+                if self.env == 'waterbox':
+                    if segid.startswith("HET"):
+            
+                        # Note the residue name for checks
+                        self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                        # resname should be a 3 or 4 letters code
+                        assert len(self.resname) < 5
 
-                    self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
-                    self._make_folder(
-                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
-                    )
-                    self.pdb_file[df.segid == f"{segid}"].save(
-                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                        overwrite=True,
-                    )
-                    self.pdb_file[df.segid == f"{segid}"].save(
-                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                        overwrite=True,
-                    )
-
-                else:
-                    try:
+                        self._make_folder(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
+                        )
                         self.pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.crd",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         self.pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/complex/{segid.lower()}.pdb",
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
-                    except:
+                    else:
+                        # No other segment IDs should be output for the waterbox environment
                         pass
 
-        # resname should be a 3 or 4 letters code
-        assert len(self.resname) < 5
+                # COMPLEX ENVIRONMENT
+                elif self.env == 'complex':
+                    if segid.startswith("HET"):
+                        # TODO: Should this check be more generally applied?
+                        # Note the residue name for checks
+                        self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                        # resname should be a 3 or 4 letters code
+                        assert len(self.resname) < 5
 
-        return segids
+                        self._make_folder(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
+                        )
+                        self.pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                            overwrite=True,
+                        )
+                        self.pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                            overwrite=True,
+                        )
+
+                    else:
+                        # self._make_folder(
+                        #     f"{self.parent_dir}/{self.ligand_id}/{self.env}"
+                        # )
+                        self.pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                            overwrite=True,
+                        )
+                        self.pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.pdb",
+                            overwrite=True,
+                        )
+                else:
+                    print(f"Unrecognized environment: {self.env}")
+
+
+        return segids, used_segids
 
 
 class CharmmManipulation:
