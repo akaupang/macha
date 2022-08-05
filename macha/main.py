@@ -28,10 +28,13 @@ ligand_ids = check_ligands(parent_dir = parent_dir, original_dir = original_dir,
 
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
-
+    
+    print(f"\n")
     print(f"Processing ligand {ligand_id}")
 
     for env in ["waterbox", "complex"]:
+        # Preparation of ligands
+        # Instantiate class
         preparation = Preparation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
@@ -39,14 +42,19 @@ for ligand_id in ligand_ids:
             env=env,
         )
 
-        # Make a Transformato style folder structure below a folder bearing
-        # the name of the ligand
+        # Make a Transformato style folder structure
         preparation.makeTFFolderStructure()
-        segids = preparation.createCRDfiles()
-
+        # Create CHARMM Coordinate files
+        segids, used_segids = preparation.createCRDfiles()
+        print("The following segment IDs were found/created:")
+        print(*segids)
+        print("The following segment IDs were used/not excluded:")
+        print(*used_segids)
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
+        # Edit the CHARMM-GUI scripts
+        # Instantiate class
         charmmManipulation = CharmmManipulation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
@@ -58,7 +66,7 @@ for ligand_id in ligand_ids:
         # Copy Files from the template folder
         charmmManipulation.copyFiles()
         # Modify step1_pdbreader.inp to read in correct amount of chains/residues
-        charmmManipulation.modifyStep1(segids)
+        charmmManipulation.modifyStep1(used_segids)
         # Run Charmm giving the correct executable path
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
         charmmManipulation.applyHMR()
