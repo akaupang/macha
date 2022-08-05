@@ -68,5 +68,6 @@ for ligand_id in ligand_ids:
         # Modify step1_pdbreader.inp to read in correct amount of chains/residues
         charmmManipulation.modifyStep1(used_segids)
         # Run Charmm giving the correct executable path
-        charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        # charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        charmmManipulation.createOpenMMSystem()
         charmmManipulation.applyHMR()

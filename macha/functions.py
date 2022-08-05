@@ -291,6 +291,7 @@ class Preparation:
 
         return self.pdb_file
 
+
     def _check_for_hydrogens(self):
         if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
             self.input_type = "hydrogens"
@@ -534,10 +535,6 @@ class CharmmManipulation:
         file = open(f"{self.ligand_id}/{self.env}/toppar.str", "a")
         file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
         file.close()
-        # manipulate toppar.str file for use with openmm
-        file = open(f"{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
-        file.write(f"stream ../{self.resname.lower()}/{self.resname.lower()}.str")
-        file.close()
 
     def copyFiles(self):
 
@@ -552,18 +549,8 @@ class CharmmManipulation:
             f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/openmm/toppar.str"
         )
         shutil.copy(
-            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
-        )
-        shutil.copy(
-            f"{self.default_path}/omm_step5_production.inp", f"{self.ligand_id}/{self.env}/openmm/step5_production.inp"
-        )
-        shutil.copy(
             f"{self.default_path}/checkfft.py", f"{self.ligand_id}/{self.env}/checkfft.py"
         )
-
-        # copy files for OpenMM
-        for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
-            shutil.copy(file, f"{self.ligand_id}/{self.env}/openmm/")
 
         try:
             shutil.copytree(
@@ -629,41 +616,84 @@ class CharmmManipulation:
 
     def applyHMR(self):
 
-        if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+        try:
 
-            parms = ()
-            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                parms += ( file, )
+            if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
 
-            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-            params = pm.charmm.CharmmParameterSet(*parms)
+                parms = ()
+                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                    parms += ( file, )
 
-            shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
-            psf.load_parameters(params)
-            pm.tools.actions.HMassRepartition(psf).execute()
-            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                params = pm.charmm.CharmmParameterSet(*parms)
 
-            # assure that mass is greater than one
-            for atom in psf:
-                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                    assert atom.mass > 1.5
-        else:
-            
-            parms = ()
-            for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                parms += ( file, )
+                shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
+                psf.load_parameters(params)
+                pm.tools.actions.HMassRepartition(psf).execute()
+                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
-            parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-            params = pm.charmm.CharmmParameterSet(*parms)
+                # assure that mass is greater than one
+                for atom in psf:
+                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                        assert atom.mass > 1.5
+            else:
+                
+                parms = ()
+                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                    parms += ( file, )
 
-            psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-            psf.load_parameters(params)
-            pm.tools.actions.HMassRepartition(psf).execute()
-            psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                params = pm.charmm.CharmmParameterSet(*parms)
 
-            # assure that mass is greater than one
-            for atom in psf:
-                if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                    assert atom.mass > 1.5
+                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                psf.load_parameters(params)
+                pm.tools.actions.HMassRepartition(psf).execute()
+                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+
+                # assure that mass is greater than one
+                for atom in psf:
+                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                        assert atom.mass > 1.5
+        except:
+            print("Masses were left unchanged! HMR not possible, check your output! ")
+
+    def createOpenMMSystem(self):
+
+        # copy files for OpenMM
+        for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
+            shutil.copy(file, f"{self.ligand_id}/{self.env}/openmm/")
+
+        shutil.copy(
+            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
+        )
+        shutil.copy(
+            f"{self.default_path}/omm_step5_production.inp", f"{self.ligand_id}/{self.env}/openmm/step5_production.inp"
+        )
+
+        # manipulate toppar.str file for use with openmm
+        file = open(f"{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
+        file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
+        file.close()
+
+        # Create sysinfo.dat file, which contains information about the box
+        file = open(f"{self.ligand_id}/{self.env}/step3_pbcsetup.str")
+        for line in file:
+            if line.startswith(f" SET A "):
+                a = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET B "):
+                b = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET C "):
+                c = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET ALPHA "):
+                alpha = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET BETA "):
+                beta = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET GAMMA "):
+                gamma = line.split(' ')[-1].strip()  
+
+        with open(f"{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
+            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
+
+
 

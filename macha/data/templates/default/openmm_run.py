@@ -17,7 +17,6 @@ import os
 from omm_readinputs import *
 from omm_readparams import *
 from omm_vfswitch import *
-from data.templates.default.omm_barostat import *
 from omm_restraints import *
 from omm_rewrap import *
 
