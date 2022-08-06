@@ -15,7 +15,7 @@ from functions import checkInput, Preparation, CharmmManipulation
 parent_dir = "."
 original_dir = "original"
 input_ext = "pdb"  # exclusive support for PDB
-protein_name = None # = protein.pdb
+protein_name = "protein" # = protein.pdb
 cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 
 ################################################################################
@@ -43,16 +43,19 @@ for ligand_id in ligand_ids:
             env=env,
         )
 
-        # Make a Transformato style folder structure
-        preparation.makeTFFolderStructure()
         # Check input types
         segids, df = preparation.checkInputType()
+        
+        # Make a Transformato style folder structure
+        preparation.makeTFFolderStructure()
+
         # Create CHARMM Coordinate files
         segids, used_segids = preparation.createCRDfiles(segids, df)
         print("The following segment IDs were found/created:")
         print(*segids)
         print("The following segment IDs were used/not excluded:")
         print(*used_segids)
+
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
@@ -68,8 +71,10 @@ for ligand_id in ligand_ids:
         
         # Copy Files from the template folder
         charmmManipulation.copyFiles()
+
         # Modify step1_pdbreader.inp to read in correct amount of chains/residues
         charmmManipulation.modifyStep1(used_segids)
+
         # Run Charmm giving the correct executable path
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
         charmmManipulation.createOpenMMSystem()

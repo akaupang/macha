@@ -22,23 +22,28 @@ warnings.filterwarnings("ignore", module="parmed")
 def checkInput(parent_dir= ".", original_dir="original", protein_name=None, input_ext="pdb"):
     
     # Make sure the input directory exists
-    if not os.path.isdir(original_dir):
-        sys.exit(f"Input file {original_dir} not found!")
+    if not os.path.isdir(f"{parent_dir}/{original_dir}"):
+        sys.exit(f"Input directory: {original_dir} not found!")
 
     # Look for an input protein for ligand exchange
     if protein_name != None:
-        if not os.path.isfile(f"{parent_dir}/{original_dir}/{protein_name}.{input_ext}"):
-            sys.exit(f"Protein file {parent_dir}/{original_dir}/{protein_name}.{input_ext} not found!")
+        protein_path = f"{parent_dir}/{original_dir}/{protein_name}.{input_ext}"
+        if not os.path.isfile(protein_path):
+            sys.exit(f"Protein file {protein_path} not found!")
         else:
-            print(f"Protein file for ligand exchange found at: {parent_dir}/{original_dir}/{protein_name}.{input_ext}")
-            protein_id = os.path.splitext(os.path.basename(f"{parent_dir}/{original_dir}/{protein_name}.{input_ext}"))[0]
+            print(f"Protein file for ligand exchange found at: {protein_path}")
+            protein_id = os.path.splitext(os.path.basename(protein_path))[0]
             print(f"Protein ID: {protein_id}")
     else:
         protein_id = None
-        print("No protein was specified for ligand exchange with multiple ligands.")
-        print("The input is thus assumed to consist of complexes from which to create")
-        print("waterbox + complex systems, or of single ligands from which to create"
-        print("waterbox systems.")
+        print(
+        '''
+        No protein was specified for ligand exchange with multiple ligands.
+        The input is thus assumed to consist of complexes from which to create
+        waterbox + complex systems, or of single ligands from which to create
+        waterbox systems.
+        '''
+        )
 
     # Create the master list of the ligand/system names and fill it
     ligand_ids = []
@@ -51,9 +56,6 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
         else:
             ligand_ids.append(lig_id)  #
     return protein_id, ligand_ids    
-
-
-
 
 class Preparation:
     def __init__(self, parent_dir, original_dir, ligand_id, protein_id, env):
@@ -71,10 +73,65 @@ class Preparation:
 
         self.input_type = None
 
-        # Load the PDB file into ParmEd
-        self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
-        self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+        # Distinguished treatment if the current ligand is to be merged with a protein
 
+        if self.protein_id == None:
+            # For complexes->waterbox+complex or single ligands->waterbox
+            # Load the PDB file into ParmEd
+            self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+            self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+        
+        else:
+            if self.env == "waterbox":
+                # Run like normal single ligand
+                self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+
+            elif self.env == "complex":
+                # Start the merger function
+                self.mergeToComplex()
+
+            else:
+                sys.exit(f"Unrecognized environment: {self.env}")
+    
+    def mergeToComplex(self):
+        print('* * * Start merging * * *')
+        # Here, it is practical to borrow the "self.pdb_file" temporarily
+        # for both the input protein and later for the ligand. This solution
+        # benefits from the fact that most of the internal functions in this
+        # class already work on this object. The merge function will in the end
+        # restore "self.pdb_file" as the complex.
+
+        # Load the protein
+        print(f"Processing protein (input typing, segid addition, HETx removal)")
+        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.protein_id}.pdb", structure=True)
+
+        # What kind of protein file has been provided?
+        # Remember: segids will be added if there are none
+        segids, df = self.checkInputType()
+ 
+        # Get the parts of the parmed object (protein) that does not contain
+        # "HET" in the segid column
+        # Note the tilde to invert the boolean mask!
+        apo_pdb = self.pdb_file[~df.segid.str.contains("HET")]
+
+        # Load the ligand
+        print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
+        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb", structure=True)
+
+        # Add segids to ligand PDB object if there are none
+        segids, df = self.checkInputType()
+
+        lig_pdb = self.pdb_file
+
+        # Overwrite the self.pdb_file by joining the structures 
+        # (no reordering to a typical PROA, HETA, IONS, WAT/SOLV)
+        self.pdb_file = apo_pdb + lig_pdb
+
+
+        print('* * * End merging * * *')
+
+    
     def createUniqueAtomName(self): # UNUSED FUNCTION
 
         #self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
@@ -107,7 +164,6 @@ class Preparation:
                 raise
 
     def makeTFFolderStructure(self):
-
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
@@ -115,7 +171,7 @@ class Preparation:
 
     def _create_mol2_file(self):
 
-        print(f"Converting the residue pdb file to a mol2 and sdf file")
+        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
 
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
@@ -124,15 +180,12 @@ class Preparation:
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
+
+        # Useful for H-less ligands directly from x-ray crystallography PDBs
         if self.input_type == "hydrogens":
             pass
         elif self.input_type == "nohydrogens":
-            mol.AddHydrogens() #TODO: Do we need this? ÅK: since the user will 
-        # prepare (modified) ligands in any case, I'd rather see this function
-        # fail gracefully if explicit hydrogens are not all present. 
-        # UPDATE - it seems to be needed for mol2 files made from pdb slices,
-        # that are producing when a raw x-ray-derived PDB file (no hydrogens)
-        # is used as an input file.
+            mol.AddHydrogens()
 
         #DEBUG
         #with open(f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb", 'r') as hei:
@@ -402,7 +455,7 @@ class Preparation:
         # We will cater for two types of PDB files
         # 1: Canonical/MAESTRO-derived PDB files
         # 2: CHARMM-derived PDB files
-        # This distinction is made by looking for segids and counting these.
+        # This distinction is made by looking for segids.
         # Canonical/MAESTRO-derived PDB files will be void of segids, but will
         # have chain IDs, while CHARMM PDB files contain the segid column, but
         # lack chain IDs. 
@@ -499,7 +552,7 @@ class Preparation:
                             overwrite=True,
                         )
                 else:
-                    print(f"Unrecognized environment: {self.env}")
+                    sys.exit(f"Unrecognized environment: {self.env}")
 
 
         return segids, used_segids
