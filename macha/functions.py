@@ -14,62 +14,128 @@ import subprocess
 import parmed as pm
 from openbabel import openbabel
 import string
+import numpy as np
 from .charmm_factory import CharmmFactory
 
 import warnings
 warnings.filterwarnings("ignore", module="parmed")
 
-def check_ligands(parent_dir= ".", original_dir="original", ligands_dir = "ligands", input_ext="pdb"):
-
-    if not os.path.isdir(original_dir):
-        sys.exit(f"Input file {original_dir} not found!")
+def checkInput(parent_dir= ".", original_dir="original", protein_name=None, input_ext="pdb"):
     
-    try:
-        ligand_id = sys.argv[1]
-        # Check for existence of ligands/"ligandid"
-        if os.path.exists(f"{parent_dir}/{ligands_dir}/{ligand_id}.{input_ext}"):
+    # Make sure the input directory exists
+    if not os.path.isdir(f"{parent_dir}/{original_dir}"):
+        sys.exit(f"Input directory: {original_dir} not found!")
+
+    # Look for an input protein for ligand exchange
+    if protein_name != None:
+        protein_path = f"{parent_dir}/{original_dir}/{protein_name}.{input_ext}"
+        if not os.path.isfile(protein_path):
+            print(f"No protein for ligand exchange found.")
+            protein_id = None
+        else:
+            print(f"Protein for ligand exchange found at: {protein_path}")
+            protein_id = os.path.splitext(os.path.basename(protein_path))[0]
+            print(f"Protein ID: {protein_id}")
+    else:
+        protein_id = None
+
+    if protein_id == None:
+        print(
+        '''
+        No protein was specified for ligand exchange with multiple ligands.
+        The input is thus assumed to consist either of complexes from which to create
+        waterboxes + complexes, OR of single ligands from which to create waterboxes
+        (use the -nc switch for efficiency).
+        '''
+        )
+
+    # Create the master list of the ligand/system names and fill it
+    ligand_ids = []
+    # Add multiple ligands
+    for ifile in glob.glob(f"{parent_dir}/{original_dir}/*.{input_ext}"):
+        lig_id = os.path.splitext(os.path.basename(ifile))[0]
+        # But don't add the protein/complex
+        if lig_id == protein_id:
             pass
         else:
-            sys.exit(
-                f"Input file: {parent_dir}/{ligands_dir}/{ligand_id}.{input_ext} not found!"
-            )
-
-    # If no argument is given, run in multiple ligand mode
-    except IndexError:
-        ligand_id = None  # None in particular
-
-    # Create the master list of the ligand/system names and fill it based on
-    # the findings above
-    ligand_ids = []
-    if ligand_id == None:
-        for ifile in glob.glob(f"{parent_dir}/{original_dir}/*.{input_ext}"):
-            ligand_ids.append(os.path.splitext(os.path.basename(ifile))[0])  #
-    elif ligand_id != "":
-        ligand_ids.append(ligand_id)
-    else:
-        sys.exit(f"Unknown ligand (file) name error with name: {ligand_id}")
-
-    return ligand_ids
-
+            ligand_ids.append(lig_id)  #
+    return protein_id, ligand_ids    
 
 class Preparation:
-    def __init__(self, parent_dir, ligand_id, original_dir, env):
+    def __init__(self, parent_dir, original_dir, ligand_id, protein_id, env):
         """
         This class prepares everything for further use with CHARMM. The PDB 
         files are sliced into pieces and the ligand is converted to a mol2 file.
         A local version of CGenFF creates a stream file for the ligand.
         """
         self.parent_dir = parent_dir
-        self.ligand_id = ligand_id
         self.original_dir = original_dir
+        self.ligand_id = ligand_id
+        self.protein_id = protein_id
         self.resname = str
         self.env: str = env
+
         self.input_type = None
 
-        # Load the PDB file into ParmEd
-        self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
-        self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+        # Distinguished treatment if the current ligand is to be merged with a protein
 
+        if self.protein_id == None:
+            # For complexes->waterbox+complex or single ligands->waterbox
+            # Load the PDB file into ParmEd
+            self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+            self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+        
+        else:
+            if self.env == "waterbox":
+                # Run like normal single ligand
+                self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+
+            elif self.env == "complex":
+                # Start the merger function
+                self.mergeToComplex()
+
+            else:
+                sys.exit(f"Unrecognized environment: {self.env}")
+    
+    def mergeToComplex(self):
+        print('* * * Start merging * * *')
+        # Here, it is practical to borrow the "self.pdb_file" temporarily
+        # for both the input protein and later for the ligand. This solution
+        # benefits from the fact that most of the internal functions in this
+        # class already work on this object. The merge function will in the end
+        # restore "self.pdb_file" as the complex.
+
+        # Load the protein
+        print(f"Processing protein (input typing, segid addition, HETx removal)")
+        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.protein_id}.pdb", structure=True)
+
+        # What kind of protein file has been provided?
+        # Remember: segids will be added if there are none
+        segids, df = self.checkInputType()
+ 
+        # Get the parts of the parmed object (protein) that does not contain
+        # "HET" in the segid column
+        # Note the tilde to invert the boolean mask!
+        apo_pdb = self.pdb_file[~df.segid.str.contains("HET")]
+
+        # Load the ligand
+        print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
+        self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb", structure=True)
+
+        # Add segids to ligand PDB object if there are none
+        segids, df = self.checkInputType()
+
+        lig_pdb = self.pdb_file
+
+        # Overwrite the self.pdb_file by joining the structures 
+        # (no reordering to a typical PROA, HETA, IONS, WAT/SOLV)
+        self.pdb_file = apo_pdb + lig_pdb
+
+
+        print('* * * End merging * * *')
+
+    
     def createUniqueAtomName(self): # UNUSED FUNCTION
 
         #self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
@@ -102,7 +168,6 @@ class Preparation:
                 raise
 
     def makeTFFolderStructure(self):
-
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
@@ -110,7 +175,7 @@ class Preparation:
 
     def _create_mol2_file(self):
 
-        print(f"Converting the residue pdb file to a mol2 and sdf file")
+        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
 
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
@@ -119,15 +184,12 @@ class Preparation:
             mol,
             f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
-        if self.input_type == "hydrogens":
+
+        # Useful for H-less ligands directly from x-ray crystallography PDBs
+        if self.input_type == "allhydrogens":
             pass
-        elif self.input_type == "nohydrogens":
-            mol.AddHydrogens() #TODO: Do we need this? ÅK: since the user will 
-        # prepare (modified) ligands in any case, I'd rather see this function
-        # fail gracefully if explicit hydrogens are not all present. 
-        # UPDATE - it seems to be needed for mol2 files made from pdb slices,
-        # that are producing when a raw x-ray-derived PDB file (no hydrogens)
-        # is used as an input file.
+        elif self.input_type == "missinghydrogens":
+            mol.AddHydrogens()
 
         #DEBUG
         #with open(f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb", 'r') as hei:
@@ -293,12 +355,19 @@ class Preparation:
 
 
     def _check_for_hydrogens(self):
-        if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
-            self.input_type = "hydrogens"
-            print("Hydrogens are present")
+        # Do hydrogens cover all residues?
+        h_cont_res = [res.name for res in self.pdb_file.residues if any([True for atm in res.atoms if atm.element_name == "H"])]
+        no_h_res = [res.name for res in self.pdb_file.residues if any([True for atm in res.atoms if atm.element_name != "H"])]
+
+        h_miss_res = list(np.setdiff1d(no_h_res, h_cont_res))
+
+        #if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
+        if len(h_cont_res) == len(no_h_res):
+            self.input_type = "allhydrogens"
+            print("All residues appear to be fully hydrogenated")
         else:
-            self.input_type = "nohydrogens"
-            print("No hydrogens are present")
+            self.input_type = "missinghydrogens"
+            print(f"Some residues appear to lack hydrogens: {h_miss_res}")
 
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
@@ -362,7 +431,8 @@ class Preparation:
 
             # Set a temporary previous residue number
             prev_resnum = -1
-            
+
+            # Loop over the residues in the current chain
             for res in self.pdb_file.view[df.chain == f"{chain}"].residues: # produce a select view of this chain's residues using a boolean mask
                 resnum = res.number
                 if res.name in aa_res:
@@ -378,12 +448,11 @@ class Preparation:
                         res.segid = f"HET{het_letters.pop(0)}"
                     #self.resname = i.residue.name
                 prev_resnum = resnum
-         
 
         return self.pdb_file
         
-    def createCRDfiles(self):
-        
+    def checkInputType(self):
+    
         # Remove lone pairs (if any)
         self.pdb_file = self._remove_lp()
         
@@ -391,13 +460,13 @@ class Preparation:
         # ATTENTION: All occurrences of HIS will become HSD
         self.pdb_file = self._check_ionizable()
 
-        # Store the PDB as a dataframe for later use
+        # Store the input PDB as a dataframe for later use
         df = self.pdb_file.to_dataframe()
 
         # We will cater for two types of PDB files
         # 1: Canonical/MAESTRO-derived PDB files
         # 2: CHARMM-derived PDB files
-        # This distinction is made by looking for segids and counting these.
+        # This distinction is made by looking for segids.
         # Canonical/MAESTRO-derived PDB files will be void of segids, but will
         # have chain IDs, while CHARMM PDB files contain the segid column, but
         # lack chain IDs. 
@@ -425,17 +494,11 @@ class Preparation:
             # Check for hydrogens
             # set self.input_type
             self._check_for_hydrogens()
-    
-        #segids = set(i.residue.segid for i in self.pdb_file)
-        
-        # Evaluate the found/created segids and output coordinate files
-        # if len(segids) == 1:  # This case applies to an input PDB containing ONLY the ligand.
-        #     segids = ['HETA']
-        #     for atom in self.pdb_file:
-        #         atom.residue.segid = "HETA"
 
-        #     # Update the dataframe with the new segid
-        #     df = self.pdb_file.to_dataframe()
+        return segids, df
+    
+    def createCRDfiles(self, segids, df):
+
         exclude_segids = ["SOLV", "IONS", "WATA", "WATB", "WATC", "CRST", "HETB", "HETC"]
         used_segids = []
         for segid in segids:
@@ -470,6 +533,7 @@ class Preparation:
                 # COMPLEX ENVIRONMENT
                 elif self.env == 'complex':
                     if segid.startswith("HET"):
+
                         # TODO: Should this check be more generally applied?
                         # Note the residue name for checks
                         self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
@@ -489,9 +553,7 @@ class Preparation:
                         )
 
                     else:
-                        # self._make_folder(
-                        #     f"{self.parent_dir}/{self.ligand_id}/{self.env}"
-                        # )
+
                         self.pdb_file[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
@@ -501,7 +563,7 @@ class Preparation:
                             overwrite=True,
                         )
                 else:
-                    print(f"Unrecognized environment: {self.env}")
+                    sys.exit(f"Unrecognized environment: {self.env}")
 
 
         return segids, used_segids
