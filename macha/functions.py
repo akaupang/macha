@@ -14,6 +14,7 @@ import subprocess
 import parmed as pm
 from openbabel import openbabel
 import string
+import numpy as np
 from .charmm_factory import CharmmFactory
 
 import warnings
@@ -29,19 +30,22 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     if protein_name != None:
         protein_path = f"{parent_dir}/{original_dir}/{protein_name}.{input_ext}"
         if not os.path.isfile(protein_path):
-            sys.exit(f"Protein file {protein_path} not found!")
+            print(f"No protein for ligand exchange found.")
+            protein_id = None
         else:
-            print(f"Protein file for ligand exchange found at: {protein_path}")
+            print(f"Protein for ligand exchange found at: {protein_path}")
             protein_id = os.path.splitext(os.path.basename(protein_path))[0]
             print(f"Protein ID: {protein_id}")
     else:
         protein_id = None
+
+    if protein_id == None:
         print(
         '''
         No protein was specified for ligand exchange with multiple ligands.
-        The input is thus assumed to consist of complexes from which to create
-        waterbox + complex systems, or of single ligands from which to create
-        waterbox systems.
+        The input is thus assumed to consist either of complexes from which to create
+        waterboxes + complexes, OR of single ligands from which to create waterboxes
+        (use the -nc switch for efficiency).
         '''
         )
 
@@ -182,9 +186,9 @@ class Preparation:
         )
 
         # Useful for H-less ligands directly from x-ray crystallography PDBs
-        if self.input_type == "hydrogens":
+        if self.input_type == "allhydrogens":
             pass
-        elif self.input_type == "nohydrogens":
+        elif self.input_type == "missinghydrogens":
             mol.AddHydrogens()
 
         #DEBUG
@@ -351,12 +355,19 @@ class Preparation:
 
 
     def _check_for_hydrogens(self):
-        if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
-            self.input_type = "hydrogens"
-            print("Hydrogens are present in the input file")
+        # Do hydrogens cover all residues?
+        h_cont_res = [res.name for res in self.pdb_file.residues if any([True for atm in res.atoms if atm.element_name == "H"])]
+        no_h_res = [res.name for res in self.pdb_file.residues if any([True for atm in res.atoms if atm.element_name != "H"])]
+
+        h_miss_res = list(np.setdiff1d(no_h_res, h_cont_res))
+
+        #if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
+        if len(h_cont_res) == len(no_h_res):
+            self.input_type = "allhydrogens"
+            print("All residues appear to be fully hydrogenated")
         else:
-            self.input_type = "nohydrogens"
-            print("No hydrogens are present in the input file")
+            self.input_type = "missinghydrogens"
+            print(f"Some residues appear to lack hydrogens: {h_miss_res}")
 
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
