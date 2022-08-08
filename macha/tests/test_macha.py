@@ -1,5 +1,5 @@
 import pytest
-from macha.functions import Preparation, check_ligands
+from macha.functions import Preparation, checkInput
 
 
 ligand_id = "../data/templates/cdk2_32.pdb"
