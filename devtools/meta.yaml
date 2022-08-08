@@ -13,7 +13,7 @@ requirements:
     - setuptools
     
   
-  script: python devtools/setup.py install
+  script: python setup.py install
     
 
 
