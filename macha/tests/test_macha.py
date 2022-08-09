@@ -26,6 +26,7 @@ def test_createFolders():
     pdb_macha = preparation.pdb_file
     pdb_orig = pm.load_file("macha/data/original/cdk2_l32.pdb")
    
+    # check if pdb file is read in correctly by parmed and compare a random atom to the original file
     number = randint(0,9065)
     assert str(pdb_macha.atoms[number]) == str(pdb_orig.atoms[number])
 
