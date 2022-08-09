@@ -24,7 +24,7 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     
     # Make sure the input directory exists
     if not os.path.isdir(f"{parent_dir}/{original_dir}"):
-        sys.exit(f"Input directory: {original_dir} not found!")
+        sys.exit(f"Input directory: {parent_dir}/{original_dir} not found!")
 
     # Look for an input protein for ligand exchange
     if protein_name != None:
@@ -62,7 +62,7 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     return protein_id, ligand_ids    
 
 class Preparation:
-    def __init__(self, parent_dir, original_dir, ligand_id, protein_id, env):
+    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None):
         """
         This class prepares everything for further use with CHARMM. The PDB 
         files are sliced into pieces and the ligand is converted to a mol2 file.
