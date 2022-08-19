@@ -37,9 +37,9 @@ delete atom sele all end
 
 ! Make box at least twice the size of a cut off value of 12 A
 
-if @Xinit .le. 23 set Xinit = 24
-if @Yinit .le. 23 set Yinit = 24
-if @Zinit .le. 23 set Zinit = 24
+if @Xinit .le. 23 set Xinit = 26
+if @Yinit .le. 23 set Yinit = 26
+if @Zinit .le. 23 set Zinit = 26
 
 ! parameters for water box & image (crystal) 
 
