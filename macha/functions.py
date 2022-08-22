@@ -82,13 +82,13 @@ class Preparation:
         if self.protein_id == None:
             # For complexes->waterbox+complex or single ligands->waterbox
             # Load the PDB file into ParmEd
-            self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+            self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
         
         else:
             if self.env == "waterbox":
                 # Run like normal single ligand
-                self.pdb_file_orig = f"{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
 
             elif self.env == "complex":
@@ -182,7 +182,7 @@ class Preparation:
         mol = openbabel.OBMol()
         obConversion.ReadFile(
             mol,
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
 
         # Useful for H-less ligands directly from x-ray crystallography PDBs
@@ -198,27 +198,27 @@ class Preparation:
         assert (mol.NumResidues()) == 1
         obConversion.WriteFile(
             mol,
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
         )
         obConversion.SetInAndOutFormats("pdb", "sdf")
         mol = openbabel.OBMol()
         obConversion.ReadFile(
             mol,
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
         )
         obConversion.WriteFile(
             mol,
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
         )
 
     def _modify_resname_in_stream(self):
 
         fin = open(
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
             "rt",
         )
         fout = open(
-            f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
             "wt",
         )
         for line in fin:
@@ -264,12 +264,12 @@ class Preparation:
             
             # Remove stream file otherwise CGenFF will append the new one at 
             # the end of the old one
-            stream_file = f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
+            stream_file = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
             if os.path.isfile(stream_file):
                 os.remove(stream_file)
 
             # Run CGenFF
-            ligand_path = f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}"
+            ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}"
 
             cgenff_output = subprocess.run(
                 [cgenff_bin]
@@ -593,7 +593,7 @@ class CharmmManipulation:
     def _manipulateToppar(self):
 
         # manipulate toppar_charmm.str file
-        file = open(f"{self.ligand_id}/{self.env}/toppar.str", "a")
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str", "a")
         file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
         file.close()
 
@@ -601,21 +601,21 @@ class CharmmManipulation:
 
         # copy CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
-            shutil.copy(file, f"{self.ligand_id}/{self.env}/")
+            shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
 
         shutil.copy(
-            f"{self.default_path}/toppar_charmm.str", f"{self.ligand_id}/{self.env}/toppar.str"
+            f"{self.default_path}/toppar_charmm.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str"
         )
         shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.ligand_id}/{self.env}/openmm/toppar.str"
+            f"{self.default_path}/toppar.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str"
         )
         shutil.copy(
-            f"{self.default_path}/checkfft.py", f"{self.ligand_id}/{self.env}/checkfft.py"
+            f"{self.default_path}/checkfft.py", f"{self.parent_dir}/{self.ligand_id}/{self.env}/checkfft.py"
         )
 
         try:
             shutil.copytree(
-                f"{self.default_path}/toppar", f"{self.ligand_id}/{self.env}/toppar"
+                f"{self.default_path}/toppar", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar"
             )
         except:
             print(f"Toppar directory is already available")
@@ -626,8 +626,8 @@ class CharmmManipulation:
 
         correction_on = False
 
-        fout = open(f"{self.ligand_id}/{self.env}/step1_pdbreader_tmp.inp", "wt")
-        with open(f"{self.ligand_id}/{self.env}/step1_pdbreader.inp", "r+") as f:
+        fout = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader_tmp.inp", "wt")
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp", "r+") as f:
             for line in f:
                 if line.startswith("! Read PROA"):
                     correction_on = True
@@ -643,21 +643,22 @@ class CharmmManipulation:
                     fout.write(line)
         fout.close()
 
-        shutil.copy(fout.name, f"{self.ligand_id}/{self.env}/step1_pdbreader.inp")
+        shutil.copy(fout.name, f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp")
         os.remove(fout.name)
 
     def _runCHARMM(self, step, charmm_exe):
         # We need to go to the specific directory to run CHARMM
-        os.chdir(f"{self.ligand_id}/{self.env}/")
+        main_dir = os.getcwd()
+        os.chdir(f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
         output = subprocess.run(
             [f"{charmm_exe}"] + ["-i"] + [f"{step}.inp"] + ["-o"] + [f"{step}.out"],
             text=True,
             capture_output=True,
         )
-        os.chdir("../../")
+        os.chdir(main_dir)
         if output.returncode:
             print(
-                f"Something went wrong, please check the outputfile in {self.ligand_id}/{self.env}/{step}.out"
+                f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
             )
             sys.exit
         else:
@@ -679,25 +680,27 @@ class CharmmManipulation:
 
         try:
             # If the system has not been updated/overwritten (input_orig does not exist)
-            if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+            if not os.path.isfile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+
 
                 # Load parameters
                 parms = ()
-                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
                     parms += ( file, )
 
-                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
                 params = pm.charmm.CharmmParameterSet(*parms)
 
                 # Copy the original PSF to a backup (input_orig)
-                shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                shutil.copy(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
 
                 # Load the PSF into ParmEd
-                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
+                psf = pm.charmm.CharmmPsfFile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf")
+
                 psf.load_parameters(params)
                 # Apply HMR and save PSF
                 pm.tools.actions.HMassRepartition(psf).execute()
-                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                psf.save(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
                 # Assure that mass is greater than one
                 for atom in psf:
@@ -709,18 +712,19 @@ class CharmmManipulation:
             else:
                 # Load parameters
                 parms = ()
-                for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+                for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
                     parms += ( file, )
 
-                parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
                 params = pm.charmm.CharmmParameterSet(*parms)
 
                 # Load the backed up PSF into ParmEd
-                psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+                psf = pm.charmm.CharmmPsfFile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+
                 psf.load_parameters(params)
                 # Apply HMR and save PSF
                 pm.tools.actions.HMassRepartition(psf).execute()
-                psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+                psf.save(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
                 # Assure that mass is greater than one
                 for atom in psf:
@@ -734,22 +738,22 @@ class CharmmManipulation:
 
         # copy files for OpenMM
         for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
-            shutil.copy(file, f"{self.ligand_id}/{self.env}/openmm/")
+            shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
 
         shutil.copy(
-            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
+            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
         )
         shutil.copy(
-            f"{self.default_path}/omm_step5_production.inp", f"{self.ligand_id}/{self.env}/openmm/step5_production.inp"
+            f"{self.default_path}/omm_step5_production.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step5_production.inp"
         )
 
         # manipulate toppar.str file for use with openmm
-        file = open(f"{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
         file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
         file.close()
 
         # Create sysinfo.dat file, which contains information about the box
-        file = open(f"{self.ligand_id}/{self.env}/step3_pbcsetup.str")
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step3_pbcsetup.str")
         for line in file:
             if line.startswith(f" SET A "):
                 a = line.split(' ')[-1].strip()
@@ -764,7 +768,7 @@ class CharmmManipulation:
             elif line.startswith(f" SET GAMMA "):
                 gamma = line.split(' ')[-1].strip()  
 
-        with open(f"{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
             f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
 
 
