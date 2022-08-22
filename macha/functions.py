@@ -678,9 +678,10 @@ class CharmmManipulation:
     def applyHMR(self):
 
         try:
-
+            # If the system has not been updated/overwritten (input_orig does not exist)
             if not os.path.isfile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
 
+                # Load parameters
                 parms = ()
                 for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
                     parms += ( file, )
@@ -688,18 +689,25 @@ class CharmmManipulation:
                 parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
                 params = pm.charmm.CharmmParameterSet(*parms)
 
+                # Copy the original PSF to a backup (input_orig)
                 shutil.copy(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+
+                # Load the PSF into ParmEd
                 psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf")
                 psf.load_parameters(params)
+                # Apply HMR and save PSF
                 pm.tools.actions.HMassRepartition(psf).execute()
                 psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
-                # assure that mass is greater than one
+                # Assure that mass is greater than one
                 for atom in psf:
                     if atom.name.startswith("H") and atom.residue.name != 'TIP3':
                         assert atom.mass > 1.5
+                print("Successfully applied HMR.")
+
+            # A backup of the orginal system exists (input_orig)
             else:
-                
+                # Load parameters
                 parms = ()
                 for file in glob.glob(f"{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
                     parms += ( file, )
@@ -707,15 +715,18 @@ class CharmmManipulation:
                 parms += (f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
                 params = pm.charmm.CharmmParameterSet(*parms)
 
+                # Load the backed up PSF into ParmEd
                 psf = pm.charmm.CharmmPsfFile(f"{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
                 psf.load_parameters(params)
+                # Apply HMR and save PSF
                 pm.tools.actions.HMassRepartition(psf).execute()
                 psf.save(f"{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
 
-                # assure that mass is greater than one
+                # Assure that mass is greater than one
                 for atom in psf:
                     if atom.name.startswith("H") and atom.residue.name != 'TIP3':
                         assert atom.mass > 1.5
+                print("Successfully applied HMR.")
         except:
             print("Masses were left unchanged! HMR not possible, check your output! ")
 

@@ -37,6 +37,9 @@ cgommpyloc_def="$PWD/prev_openmm_1"
 # The name of the internally generated step 3.1 CHARMM input script file is
 ommcname="step3.1_omm"
 
+# The name of the internally generated HMR application Python script (which uses ParmEd) is
+ahmrf_py="apply_HMR_with_ParmEd.py"
+
 # TRANSFORMATO_RELATED
 # ALL FUNCTIONS IN PYTHON BACKEND
 
@@ -57,7 +60,7 @@ run_t_submenu () {
   echo "Transformato Options"
   echo ""
   echo "Key"
-  echo " 1 : Run Transformato system creation (Python)"
+  echo " 1 : Run Transformato system creation (Python 3.9)"
   echo " 2 : Option2"
   echo " 3 : Option3"
   echo " 4 : Option4"
@@ -103,12 +106,11 @@ run_t_submenu () {
     # Run backend
     python3 main.py
     
-    #
+    # Return to Transformato submenu
     run_t_submenu
 
   elif [ "$submenuoption" = "2" ]; then
     run_t_submenu
-
 
   elif [ "$submenuoption" = "r" ];then
     runmenu
@@ -129,11 +131,13 @@ run_a_submenu () {
   echo ""
   echo "Advanced Options"
   echo ""
-  echo "Key"
+  echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
   echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
   echo " 3 : Create ligand toppar folders and parameters with local CGenFF"
-  echo " 4 : Apply HMR to system"
+  echo ""
+  echo "Key  Post-run options"
+  echo " 4 : Apply HMR to OpenMM system"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -205,9 +209,100 @@ run_a_submenu () {
     run_a_submenu
 
   elif [ "$submenuoption" = "4" ];then
+    
+    ahmrf_str='import os                                                                   \n'
+    ahmrf_str+='import sys                                                                  \n'
+    ahmrf_str+='import shutil                                                               \n'
+    ahmrf_str+='import parmed as pm                                                         \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='try:                                                                        \n'
+    ahmrf_str+='    input_dir = sys.argv[1]                                                 \n'
+    ahmrf_str+='except IndexError:                                                          \n'
+    ahmrf_str+='    input_dir = "."                                                         \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='# If the system has not been updated/overwritten (input_orig does not exist)\n'
+    ahmrf_str+='if not os.path.isfile(f"{input_dir}/openmm/step3_input_orig.psf"):          \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='    # Copy the original PSF to a backup (input_orig)                        \n'
+    ahmrf_str+='    shutil.copy(f"{input_dir}/openmm/step3_input.psf",#                     \n'
+    ahmrf_str+='                f"{input_dir}/openmm/step3_input_orig.psf")                 \n'
+    ahmrf_str+='    print("Backed up OpenMM PSF file")                                      \n'
+    ahmrf_str+='    input_psf = "step3_input.psf"                                           \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='else:                                                                       \n'
+    ahmrf_str+='    input_psf = "step3_input_orig.psf"                                      \n'
+    ahmrf_str+='    print("Reading PSF file from backup")                                   \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='# Read parameters from toppar.str to preserve loading order                 \n'
+    ahmrf_str+='parms = ()                                                                  \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='with open(f"{input_dir}/toppar.str", "r") as topparstream:                  \n'
+    ahmrf_str+='    for line in topparstream:                                               \n'
+    ahmrf_str+='        if line.startswith("*"):          # Header                          \n'
+    ahmrf_str+='            pass                                                            \n'
+    ahmrf_str+='        elif line.startswith("!"):        # Comments                        \n'
+    ahmrf_str+='            pass                                                            \n'
+    ahmrf_str+='        elif line.strip(" ") == "\\n":     # Empty lines                     \n' #NOTE ESCAPE OF BACKSLASH
+    ahmrf_str+='            pass                                                            \n'
+    ahmrf_str+='        elif line.startswith("read"):     # Legacy read statements          \n'
+    ahmrf_str+='            pass                                                            \n'
+    ahmrf_str+='        else:                                                               \n'
+    ahmrf_str+='            line = line.strip("\\n")                                         \n' #NOTE ESCAPE OF BACKSLASH
+    ahmrf_str+='            parms += ( line.split(" ")[-1], )                               \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='params = pm.charmm.CharmmParameterSet(*parms)                               \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='# Load the PSF into ParmEd                                                  \n'
+    ahmrf_str+='psf = pm.charmm.CharmmPsfFile(f"{input_dir}/openmm/{input_psf}")            \n'
+    ahmrf_str+='psf.load_parameters(params)                                                 \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='# Apply HMR and save PSF                                                    \n'
+    ahmrf_str+='pm.tools.actions.HMassRepartition(psf).execute()                            \n'
+    ahmrf_str+='psf.save(f"{input_dir}/openmm/step3_input.psf", overwrite = True)           \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='# Assure that hydrogen masses are greater than one                          \n'
+    ahmrf_str+='for atom in psf:                                                            \n'
+    ahmrf_str+='    if atom.name.startswith("H") and atom.residue.name != "TIP3":           \n'
+    ahmrf_str+='        assert atom.mass > 1.5                                              \n'
+    ahmrf_str+='                                                                            \n'
+    ahmrf_str+='print("Successfully applied HMR.")                                          \n'
       
+    # Determine input directory
+    echo ""
+    echo "Please provide the base path for the system. The directory should contain"
+    echo "toppar and openmm directories, as well as the toppar stream file."
+    call_path=$PWD
+    echo "Press Enter to use the current directory:"
+    echo ${call_path}
+    echo ""
+    echo "or press d     to provide your own directory."
+    read -r -s -n 1 key
+
+    if [ "$key" = "" ]; then
+      sys_base=$call_path
+    elif [ "$key" = "d" ]; then
+      echo "Enter new directory"
+      read sys_base      
+      if [ "$sys_base" = "" ]; then
+        run_a_submenu
+      else
+        sys_base=$(realpath "$sys_base")
+        cd $sys_base
+      fi
+    else
+      run_a_submenu
+    fi  
+
+    # Write python file
+    printf "%b" "${ahmrf_str}" > "${ahmrf_py}"
+
+    # Apply HMR
+    python3 ${ahmrf_py} ${sys_base}
+
+    # Return to submenu  
     run_a_submenu
-  
+
   elif [ "$submenuoption" = "r" ];then
     runmenu
 
