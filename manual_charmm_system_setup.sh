@@ -132,8 +132,8 @@ run_a_submenu () {
   echo "Key"
   echo " 1 : Add ligand toppar to toppar.str"
   echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
-  echo " 3 : "
-  echo " 4 : Option4"
+  echo " 3 : Create ligand toppar folders and parameters with local CGenFF"
+  echo " 4 : Apply HMR to system"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -204,6 +204,10 @@ run_a_submenu () {
     cd call_path
     run_a_submenu
 
+  elif [ "$submenuoption" = "4" ];then
+      
+    run_a_submenu
+  
   elif [ "$submenuoption" = "r" ];then
     runmenu
 
