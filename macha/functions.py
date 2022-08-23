@@ -676,6 +676,43 @@ class CharmmManipulation:
         for step in steps:
             self._runCHARMM(step, charmm_exe)
 
+    def createOpenMMSystem(self):
+
+        # copy files for OpenMM
+        for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
+            shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
+
+        shutil.copy(
+            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
+        )
+        shutil.copy(
+            f"{self.default_path}/omm_step5_production.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step5_production.inp"
+        )
+
+        # manipulate toppar.str file for use with openmm
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
+        file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
+        file.close()
+
+        # Create sysinfo.dat file, which contains information about the box
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step3_pbcsetup.str")
+        for line in file:
+            if line.startswith(f" SET A "):
+                a = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET B "):
+                b = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET C "):
+                c = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET ALPHA "):
+                alpha = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET BETA "):
+                beta = line.split(' ')[-1].strip()
+            elif line.startswith(f" SET GAMMA "):
+                gamma = line.split(' ')[-1].strip()  
+
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
+            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}') 
+
     def applyHMR(self):
 
         try:
@@ -689,6 +726,23 @@ class CharmmManipulation:
                     parms += ( file, )
 
                 parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+                
+                # ALTERNATIVE READING OF PARAMETERS FROM THE OMM-TYPE TOPPAR.STR 
+                # COPIED IN                         copyFiles
+                # MODIFIED IN                       modifyStep1 (_manipulateToppar)
+                # APPENDED WITH LIGAND TOPPAR IN    createOpenMMSystem
+                #
+                # This way of reading the parameters preserves the order of the
+                # original/CHARMM-GUI-derived toppar.str, and ensures that 
+                # duplicate parameters are read in their "intended" order - the
+                # last parameters read will overwrite older parameters and be 
+                # those used.
+                #
+                # parms = ()
+                # with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "r") as ommtopparstream:
+                #     for line in ommtopparstream:
+                #         parms += ( line.strip('\n'), )
+                
                 params = pm.charmm.CharmmParameterSet(*parms)
 
                 # Copy the original PSF to a backup (input_orig)
@@ -733,43 +787,6 @@ class CharmmManipulation:
                 print("Successfully applied HMR.")
         except:
             print("Masses were left unchanged! HMR not possible, check your output! ")
-
-    def createOpenMMSystem(self):
-
-        # copy files for OpenMM
-        for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
-            shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
-
-        shutil.copy(
-            f"{self.default_path}/omm_step4_equilibration.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
-        )
-        shutil.copy(
-            f"{self.default_path}/omm_step5_production.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step5_production.inp"
-        )
-
-        # manipulate toppar.str file for use with openmm
-        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
-        file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
-        file.close()
-
-        # Create sysinfo.dat file, which contains information about the box
-        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step3_pbcsetup.str")
-        for line in file:
-            if line.startswith(f" SET A "):
-                a = line.split(' ')[-1].strip()
-            elif line.startswith(f" SET B "):
-                b = line.split(' ')[-1].strip()
-            elif line.startswith(f" SET C "):
-                c = line.split(' ')[-1].strip()
-            elif line.startswith(f" SET ALPHA "):
-                alpha = line.split(' ')[-1].strip()
-            elif line.startswith(f" SET BETA "):
-                beta = line.split(' ')[-1].strip()
-            elif line.startswith(f" SET GAMMA "):
-                gamma = line.split(' ')[-1].strip()  
-
-        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
-            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
 
 
 
