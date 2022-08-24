@@ -629,21 +629,21 @@ class CharmmManipulation:
         return external_toppars
 
     def copyFiles(self):
-
-        # copy CHARMM related files
+        # Copy files from template path
+        # CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
 
-        shutil.copy(
-            f"{self.default_path}/toppar_charmm.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str"
-        )
-        shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str"
-        )
+        # CheckFFT script
         shutil.copy(
             f"{self.default_path}/checkfft.py", f"{self.parent_dir}/{self.ligand_id}/{self.env}/checkfft.py"
         )
 
+        # The CHARMM toppar.str (which later will be converted to OpenMM format)
+        shutil.copy(
+            f"{self.default_path}/toppar.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str"
+        )
+        # The whole toppar directory
         try:
             shutil.copytree(
                 f"{self.default_path}/toppar", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar"
@@ -692,9 +692,10 @@ class CharmmManipulation:
             print(
                 f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
             )
-            sys.exit
+            sys.exit('Processing terminated')
         else:
             print(f"CHARMM process finished for {step}")
+
 
     def executeCHARMM(self, charmm_exe):
 
@@ -706,7 +707,7 @@ class CharmmManipulation:
             "step3_pbcsetup_mod",
         ]
         for step in steps:
-            self._runCHARMM(step, charmm_exe)
+            returncode = self._runCHARMM(step, charmm_exe)
 
     def createOpenMMSystem(self):
         print("Creating a stand-alone OpenMM system")
@@ -734,11 +735,6 @@ class CharmmManipulation:
         except:
             print(f"Toppar directory is already available in the OpenMM directory")
 
-        # # manipulate toppar.str file for use with openmm # CREATE TOPPAR FOR OPENMM FUNCTION (FROM CHARMM TOPPAR)
-        # file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
-        # file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
-        # file.close()
-
         # Convert CHARMM toppar.str to OpenMM toppar.str
         self._convertCharmmTopparStreamToOpenmm(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str",#
                                                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str")
@@ -753,6 +749,8 @@ class CharmmManipulation:
                     shutil.copytree(f"{self.parent_dir}/{self.ligand_id}/{self.env}/{ext_top}", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/{ext_top}")
                 except FileNotFoundError:
                     print(f"ERROR: External topology/parameter folder {ext_top} not found!")
+                except FileExistsError:
+                    print(f"The topology/parameters folder {ext_top} is already present.")
 
         # Create sysinfo.dat file, which contains information about the box
         file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step3_pbcsetup.str")
@@ -776,7 +774,7 @@ class CharmmManipulation:
     def applyHMR(self):
 
         #try:
-        # If the system has not been updated/overwritten (input_orig does not exist)
+        # If input_orig does not exist (the system has not been updated/overwritten)
         if not os.path.isfile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
 
             # Load parameters

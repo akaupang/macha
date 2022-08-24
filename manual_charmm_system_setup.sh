@@ -327,7 +327,7 @@ runmenu () {
   echo "Manual Launch Control for CHARMM-GUI Scripts"
   echo ""
   echo "Key"
-  echo " a : Advanced pre-run options"
+  echo " a : Advanced pre-/post-run options"
   echo " t : Transformato options"
   echo ""
   echo " 1 : Step 1   PDB Reader (modified)"
@@ -338,7 +338,7 @@ runmenu () {
   echo ""
   echo " c : Run Steps 1-3 consecutively"
   echo ""
-  echo " 6 : Step 3.1 Convert CHARMM system to an OpenMM system"
+  echo " 6 : Step 3.1 Convert CHARMM system to a stand-alone OpenMM system"
   echo " 7 : Step 3.2 Copy CG OpenMM CHARMM interpreter python scripts to openmm/"
   echo " 8 : Step 3.3 Set system base name"
   echo "              Set simulation length (and timestep)"
@@ -465,6 +465,14 @@ runmenu () {
       done
     else
       echo "No additional topologies/parameters found in toppar.str"
+    fi
+
+    # Copy toppar folder to the OpenMM directory if it does not already exist
+    if [ -d "openmm/toppar" ]; then
+      echo "Toppar folder already present."
+    else
+      `cp -r toppar/ openmm/toppar` &&\
+      echo "Copied toppar folder to the OpenMM directory."
     fi
 
     # SIMULATION BOX SIZE
@@ -701,11 +709,11 @@ runmenu () {
     suif+='python "${p_run_param[@]}" > ${prod_prefix}.out                                 \n'
 
     submitinp="submit.sh"
-    if [ -f "openmm/$submitinp" ]; then
-      echo "SLURM submit script $submitinp found."
+    if [ -f "openmm/${submitinp}" ]; then
+      echo "SLURM submit script ${submitinp} found."
     else
-      printf "%b" "$suif" > openmm/$submitinp
-      echo "No SLURM submit script provided. Created $submitinp"
+      printf "%b" "${suif}" > openmm/${submitinp}
+      echo "No SLURM submit script provided. Created ${submitinp}"
     fi
 
     # Edit submit.sh script
@@ -717,25 +725,26 @@ runmenu () {
     # Update the path to the input PSF 
     sed -e "s/init=.*/init=step3_input/g" openmm/submit.sh > openmm/submit_rn.sh && mv openmm/submit_rn.sh openmm/submit.sh
    
-    echo "Enter simulation length (default: 1 ns) and time step (default: 2 fs)"
+    echo "Enter simulation length in ns (default: 1 ns) and time step in fs (default: 2 fs)"
     echo "Example: 100 2"
-    read nstep dt
+    read length dt
 
     # Evaluate input
-    if [[ $nstep == "" && $dt == "" ]]; then
-        nstep=500000 # 1 ns
+    if [[ ${length} == "" && ${dt} == "" ]]; then
+        length=500000 # 1 ns
         dt=0.002     # with this timestep
-    elif [[ $nstep != "" && $dt == "" ]]; then
+        nstep=`echo "1000000 * ${length} / ${dt}" | bc`
+    elif [[ ${length} != "" && ${dt} == "" ]]; then
         dt=0.002
-        nstep=`echo "1000 * $nstep / $dt" | bc`
-    elif [[ $nstep != "" && $dt != "" ]]; then
-        dt=`echo "$dt/1000" | bc`
-        nstep=`echo "1000 * $nstep / $dt" | bc`
+        nstep=`echo "1000000 * ${length} / ${dt}" | bc`
+    elif [[ ${length} != "" && ${dt} != "" ]]; then
+        nstep=`echo "1000000 * ${length} / ${dt}" | bc`
     fi
     
-    echo "Number of steps: $nstep steps"
-    dtfs=`echo "1000 * $dt" | bc`
-    echo "Timestep:        $dtfs fs"
+    echo "Simulation length: ${length} ns"
+    echo "Timestep:              ${dt} fs"
+    echo "Number of steps:    ${nstep} steps"
+
    
 
     # OpenMM Equilibration and Production Input Templates
@@ -797,24 +806,28 @@ runmenu () {
     prif+='                                                                                                                          \n'
     prif+='rest        = no                                # Turn on/off restraints                                                  \n'
 
-    if [ -f openmm/"$ommeqinp" ]; then
-      echo "OpenMM equilibration input openmm/$ommeqinp found" 
+    if [ -f openmm/"${ommeqinp}" ]; then
+      echo "OpenMM equilibration input openmm/${ommeqinp} found" 
     else
-      printf "%b" "$eqif" > openmm/$ommeqinp
-      echo "No OpenMM equilibration input provided. Created openmm/$ommeqinp"
+      printf "%b" "${eqif}" > openmm/${ommeqinp}
+      echo "No OpenMM equilibration input provided. Created openmm/${ommeqinp}"
     fi
 
-    if [ -f openmm/"$ommprodinp" ]; then
-      echo "OpenMM production input openmm/$ommprodinp found" 
+    if [ -f openmm/"${ommprodinp}" ]; then
+      echo "OpenMM production input openmm/${ommprodinp} found" 
     else
-      printf "%b" "$prif" > openmm/$ommprodinp
-      echo "No OpenMM production input provided. Created openmm/$ommprodinp"
+      printf "%b" "${prif}" > openmm/${ommprodinp}
+      echo "No OpenMM production input provided. Created openmm/${ommprodinp}"
     fi
 
     # Update the openmm/step5_production.inp with eventual arguments
     # from the user
-    `sed -e "s/nstep       = .*/nstep       = ${nstep}                            # Number of steps to run/g" openmm/step5_production.inp > openmm/step5_production_tmp.inp`
-    `sed -e "s/dt          = .*/dt          = ${dt}                               # Time-step (ps)/g" openmm/step5_production_tmp.inp > openmm/step5_production.inp`
+
+    # Dirty handling of bc result with many trailing zeros and lacking a prepended zero
+    dtps=`echo "${dt} / 1000" | bc -l`
+    dtps="0${dtps:0:4}"
+    `sed -e "s/nstep       = .*/nstep       = ${nstep}                          # Number of steps to run/g" openmm/step5_production.inp > openmm/step5_production_tmp.inp`
+    `sed -e "s/dt          = .*/dt          = ${dtps}                             # Time-step (ps)/g" openmm/step5_production_tmp.inp > openmm/step5_production.inp`
     `/bin/rm openmm/step5_production_tmp.inp`
     
     # Get number of replicas from user
@@ -823,12 +836,13 @@ runmenu () {
 
     # Make replica dirs, copy files and edit submit scripts
     curdir=${PWD##*/}
-    for rep in $(seq 1 $numberofreplicas); do
-      mkdir ../${curdir}_${rep}
-      cp -r * ../${curdir}_${rep}/
+    for rep in $(seq 1 ${numberofreplicas}); do
+      mkdir -p ../${curdir}_${rep}
+      cp -r openmm/* ../${curdir}_${rep}/
       sed -e "s/#SBATCH -J ${systemname}/#SBATCH -J ${systemname}-${rep}/g"\
-      ../${curdir}_${rep}/openmm/submit.sh > ../${curdir}_${rep}/openmm/submit_rn.sh &&\
-      mv ../${curdir}_${rep}/openmm/submit_rn.sh ../${curdir}_${rep}/openmm/submit.sh
+      ../${curdir}_${rep}/submit.sh > ../${curdir}_${rep}/submit_rn.sh &&\
+      mv ../${curdir}_${rep}/submit_rn.sh ../${curdir}_${rep}/submit.sh &&\
+      echo "Created replica at ../${curdir}_${rep}."
     done
 
     runmenu
