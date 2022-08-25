@@ -18,6 +18,7 @@ import numpy as np
 from .charmm_factory import CharmmFactory
 
 import warnings
+# Supress ParmEd warnings
 warnings.filterwarnings("ignore", module="parmed")
 
 def checkInput(parent_dir= ".", original_dir="original", protein_name=None, input_ext="pdb"):
@@ -191,10 +192,6 @@ class Preparation:
         elif self.input_type == "missinghydrogens":
             mol.AddHydrogens()
 
-        #DEBUG
-        #with open(f"{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb", 'r') as hei:
-        #    print(hei.read())
-
         assert (mol.NumResidues()) == 1
         obConversion.WriteFile(
             mol,
@@ -241,7 +238,6 @@ class Preparation:
 
         # CGenFF needs a mol2 file as input file
         self._create_mol2_file()
-
 
         # If no particular path is given, check whether CGenFF is available
         if cgenff_path == False:
@@ -367,7 +363,7 @@ class Preparation:
             print("All residues appear to be fully hydrogenated")
         else:
             self.input_type = "missinghydrogens"
-            print(f"Some residues appear to lack hydrogens: {h_miss_res}")
+            print(f"Some residues appear to lack hydrogens: {*h_miss_res,}")
 
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
@@ -590,29 +586,64 @@ class CharmmManipulation:
         import macha
         return f"{macha.__path__[0]}/data/templates/default/"
 
-    def _manipulateToppar(self):
+    def _appendToppar(self):
 
-        # manipulate toppar_charmm.str file
+        # Add line to CHARMM toppar stream to read ligand parameters
         file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str", "a")
         file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
         file.close()
 
-    def copyFiles(self):
+    def _convertCharmmTopparStreamToOpenmm(self, charmmstr_path, openmmstr_path):
+        new_toppar = ""
+        # Read the CHARMM toppar stream from the provided location
+        with open(charmmstr_path, "r") as topparstream:
+            for line in topparstream:
+                if line.startswith("*"):          # DROP: Header
+                    pass
+                elif line.startswith("!"):        # DROP: Comments
+                    pass
+                elif line.strip(" ") == "\n":     # DROP: Empty lines
+                    pass
+                elif line.startswith("read"):     # DROP: Legacy read statements
+                    pass
+                else:
+                    strpath = line.split(" ")[-1]
+                    new_toppar += f"./{strpath}"
+                    # Split on whitespace and take the last item in the
+                    # resulting list of words (the path to each stream file, 
+                    # including the newline characters.
 
-        # copy CHARMM related files
+        # Write the new OpenMM toppar stream to the requested location 
+        with open(openmmstr_path, "w") as topparstream:
+            topparstream.write(new_toppar)
+
+    def _getExternalTopparFromTopparStream(self, topparstream):
+        external_toppars = []
+        with open(topparstream, "r") as tp_str:
+            for line in tp_str:
+                if "toppar" in line:
+                    pass
+                else:
+                    external_toppars.append(line.split('/')[1])
+
+        return external_toppars
+
+    def copyFiles(self):
+        # Copy files from template path
+        # CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
 
-        shutil.copy(
-            f"{self.default_path}/toppar_charmm.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str"
-        )
-        shutil.copy(
-            f"{self.default_path}/toppar.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str"
-        )
+        # CheckFFT script
         shutil.copy(
             f"{self.default_path}/checkfft.py", f"{self.parent_dir}/{self.ligand_id}/{self.env}/checkfft.py"
         )
 
+        # The CHARMM toppar.str (which later will be converted to OpenMM format)
+        shutil.copy(
+            f"{self.default_path}/toppar.str", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str"
+        )
+        # The whole toppar directory
         try:
             shutil.copytree(
                 f"{self.default_path}/toppar", f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar"
@@ -622,7 +653,8 @@ class CharmmManipulation:
 
     def modifyStep1(self, segids):
 
-        self._manipulateToppar()
+        # Append the ligand toppar to the CHARMM toppar stream
+        self._appendToppar()
 
         correction_on = False
 
@@ -660,9 +692,10 @@ class CharmmManipulation:
             print(
                 f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
             )
-            sys.exit
+            sys.exit('Processing terminated')
         else:
             print(f"CHARMM process finished for {step}")
+
 
     def executeCHARMM(self, charmm_exe):
 
@@ -674,69 +707,50 @@ class CharmmManipulation:
             "step3_pbcsetup_mod",
         ]
         for step in steps:
-            self._runCHARMM(step, charmm_exe)
-
-    def applyHMR(self):
-
-        try:
-
-            if not os.path.isfile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
-
-                parms = ()
-                for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                    parms += ( file, )
-
-                parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-                params = pm.charmm.CharmmParameterSet(*parms)
-
-                shutil.copy(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf",f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-                psf = pm.charmm.CharmmPsfFile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf")
-                psf.load_parameters(params)
-                pm.tools.actions.HMassRepartition(psf).execute()
-                psf.save(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
-
-                # assure that mass is greater than one
-                for atom in psf:
-                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                        assert atom.mass > 1.5
-            else:
-                
-                parms = ()
-                for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-                    parms += ( file, )
-
-                parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
-                params = pm.charmm.CharmmParameterSet(*parms)
-
-                psf = pm.charmm.CharmmPsfFile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
-                psf.load_parameters(params)
-                pm.tools.actions.HMassRepartition(psf).execute()
-                psf.save(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
-
-                # assure that mass is greater than one
-                for atom in psf:
-                    if atom.name.startswith("H") and atom.residue.name != 'TIP3':
-                        assert atom.mass > 1.5
-        except:
-            print("Masses were left unchanged! HMR not possible, check your output! ")
+            returncode = self._runCHARMM(step, charmm_exe)
 
     def createOpenMMSystem(self):
-
-        # copy files for OpenMM
+        print("Creating a stand-alone OpenMM system")
+        
+        # Copy files for OpenMM
+        # OpenMM Python scripts 
         for file in glob.glob(f"{self.default_path}/[!checkfft.py]*py"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
-
+        
+        # Equilibration input file
         shutil.copy(
             f"{self.default_path}/omm_step4_equilibration.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step4_equilibration.inp"
         )
+        
+        # Production input file
         shutil.copy(
             f"{self.default_path}/omm_step5_production.inp", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step5_production.inp"
         )
 
-        # manipulate toppar.str file for use with openmm
-        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "a")
-        file.write(f"../{self.resname.lower()}/{self.resname.lower()}.str")
-        file.close()
+        # Toppar directory from CHARMM base directory to the OpenMM directory
+        try:
+            shutil.copytree(
+                f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar"
+            )
+        except:
+            print(f"Toppar directory is already available in the OpenMM directory")
+
+        # Convert CHARMM toppar.str to OpenMM toppar.str
+        self._convertCharmmTopparStreamToOpenmm(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str",#
+                                                f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str")
+
+        # Inspect OpenMM toppar.str to identify ligands whose parameter
+        # folders should be copied
+        external_toppars = self._getExternalTopparFromTopparStream(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str")
+
+        if external_toppars != []:
+            for ext_top in external_toppars:
+                try:
+                    shutil.copytree(f"{self.parent_dir}/{self.ligand_id}/{self.env}/{ext_top}", f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/{ext_top}")
+                except FileNotFoundError:
+                    print(f"ERROR: External topology/parameter folder {ext_top} not found!")
+                except FileExistsError:
+                    print(f"The topology/parameters folder {ext_top} is already present.")
 
         # Create sysinfo.dat file, which contains information about the box
         file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step3_pbcsetup.str")
@@ -755,7 +769,73 @@ class CharmmManipulation:
                 gamma = line.split(' ')[-1].strip()  
 
         with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/sysinfo.dat","w") as f:
-            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}')  
+            f.write('{"dimensions":['+f'{a}, {b}, {c}, {alpha}, {beta}, {gamma}'+']}') 
+
+    def applyHMR(self):
+
+        #try:
+        # If input_orig does not exist (the system has not been updated/overwritten)
+        if not os.path.isfile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"):
+
+            # Load parameters
+            # parms = ()
+            # for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
+            #     parms += ( file, )
+
+            # parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
+            
+            # Copy the original PSF to a backup (input_orig)
+            shutil.copy(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf",
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf")
+            print("Backed up OpenMM PSF file")
+
+            input_psf = "step3_input.psf"
+
+        # A backup of the orginal system exists (input_orig)
+        else:
+            input_psf = "step3_input_orig.psf"
+            print("Reading PSF file from backup")
+
+        ## Load parameter into ParmEd
+        # PARAMETERS ARE LOADED DUE TO A BUG IN PARMED*
+        #
+        # This way of reading the parameters preserves the order of the
+        # original/CHARMM-GUI-derived toppar.str, and ensures that 
+        # duplicate parameters are read in their "intended" order - the
+        # last parameters read will overwrite older parameters and be 
+        # those used.
+        #
+        parms = ()
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar.str", "r") as ommtopparstream:
+            for line in ommtopparstream:
+                parms += ( line.strip('\n'), )
+
+        # Change directory to for ParmEd to find the parameter files
+        # load the parameters and change back to the original run directory
+        cur_dir = os.getcwd()
+        os.chdir(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")     
+        params = pm.charmm.CharmmParameterSet(*parms)
+        os.chdir(cur_dir)
+
+        # Load the PSF into ParmEd
+        psf = pm.charmm.CharmmPsfFile(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/{input_psf}")
+
+        # *Since ParmEd forgot about the masses when loading the PSF above,
+        # we need to load the parameters to update the masses in the CharmmPsfFile class.
+        psf.load_parameters(params)
+
+        # Apply HMR and save PSF
+        pm.tools.actions.HMassRepartition(psf).execute()
+        psf.save(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf", overwrite = True)
+
+        # Assure that mass is greater than one
+        for atom in psf:
+            if atom.name.startswith("H") and atom.residue.name != 'TIP3':
+                assert atom.mass > 1.5
+        print("Successfully applied HMR.")
+
+        #except:
+        #    print("Masses were left unchanged! HMR not possible, check your output! ")
 
 
 

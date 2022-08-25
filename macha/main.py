@@ -46,6 +46,7 @@ else:
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
 
+    print("\n")
     print(f"Processing ligand {ligand_id}")
 
     for env in envs:
