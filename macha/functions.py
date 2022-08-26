@@ -564,7 +564,6 @@ class Preparation:
 
         return segids, used_segids
 
-
 class CharmmManipulation:
     def __init__(self, parent_dir, ligand_id, original_dir, resname, env, default_path=""):
         """
@@ -838,4 +837,28 @@ class CharmmManipulation:
         #    print("Masses were left unchanged! HMR not possible, check your output! ")
 
 
+    def createTFYamlFile(self):
+        
+        try:
+            os.makedirs(f"{self.parent_dir}/config")
+        except:
+            pass
 
+        if self.env == "waterbox":
+            
+            # Creates a yaml file for ASFE simulations using TF
+
+            fin = open(f"{self.default_path}/../temp_asfe.yaml","r")
+            fout = open(f"{self.parent_dir}/config/{self.ligand_id}.yaml","w")
+            for line in fin:
+                if line.strip().startswith("name"):
+                    new_line = line.replace("NAME",f"{self.ligand_id}")
+                    fout.write(new_line)
+                elif line.strip().startswith("tlc"):
+                    new_line = line.replace("UNK",f"{self.resname}")
+                    fout.write(new_line)
+                else: 
+                    fout.write(line)
+
+            fin.close()
+            fout.close()
