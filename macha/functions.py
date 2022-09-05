@@ -565,7 +565,7 @@ class Preparation:
         return segids, used_segids
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, default_path=""):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, include_ions = True, default_path=""):
         """
         CHARMM related files like the toppar file are modified, later the CHARMM executable is
         executed
@@ -575,6 +575,7 @@ class CharmmManipulation:
         self.original_dir: str = original_dir
         self.resname: str = resname
         self.env: str = env
+        self.include_ions: bool = include_ions
         if not default_path:
             self.default_path: str = self.get_default_path()
         else:
@@ -705,6 +706,34 @@ class CharmmManipulation:
             "step2_solvator",
             "step3_pbcsetup_mod",
         ]
+
+        if not self.include_ions:
+            # avoid processing the step2.2_ions.inp CHARMM file
+            # and remove the lines reading in these results in the 
+            # next CHARMM input file (step2_solvator)
+            steps.remove("step2.2_ions")
+
+            dir = f"{self.parent_dir}/{self.ligand_id}/{self.env}"
+            correction_on = False
+            fout = open(f"{dir}/step2_solvator.inp", "wt")
+            with open(f"{self.default_path}/step2_solvator.inp", "r+") as f:
+                for line in f:
+                    if line.startswith("! Add ions?"):
+                        correction_on = True
+
+                    if line.startswith("! Remove water molecules"):
+                        correction_on = False
+
+                    if correction_on == True:
+                        pass
+                    elif line.startswith("* set"):
+                        pass
+                    elif line.startswith("* stream step2.2_ions.str"):
+                        pass
+                    else:
+                        fout.write(line)
+            fout.close()  
+
         for step in steps:
             returncode = self._runCHARMM(step, charmm_exe)
 
