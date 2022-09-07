@@ -3,6 +3,8 @@ __pycache__
 # Files created during testing
 macha/cdk2_l32/
 macha/tyk2_l23/
+macha/data/tyk2_l23/
+macha/data/cdk2_l32/
 
 # Distribution / packaging
 .Python

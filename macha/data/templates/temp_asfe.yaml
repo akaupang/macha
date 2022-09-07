@@ -24,11 +24,11 @@ system:
 simulation:
   ################
   parameters:
-    nstep: 2500000
+    nstep: NUMBEROFSTEPS
     nstdcd: 500
     nstout: 2000
-    cons: HBonds
-    dt: 0.002
+    cons: None
+    dt: TIMESTEP
     mini_nstep: 5000
 
   workload-manager : "slurm"

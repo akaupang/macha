@@ -13,7 +13,7 @@ from functions import checkInput, Preparation, CharmmManipulation
 ################################################################################
 
 parent_dir = "."
-original_dir = "original"
+original_dir = "data/original"
 input_ext = "pdb"  # exclusive support for PDB
 protein_name = "protein" # -> protein.pdb
 cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
@@ -96,3 +96,4 @@ for ligand_id in ligand_ids:
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
         charmmManipulation.createOpenMMSystem()
         charmmManipulation.applyHMR()
+        charmmManipulation.createTFYamlFile(dt=0.002)

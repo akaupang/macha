@@ -3,8 +3,8 @@
 system:
   ################
   structure1:
-    name: "methanol"
-    tlc: "unk"
+    name: "methane"
+    tlc: "UNL"
     vacuum:
       dirname: "vacuum"
       psf_file_name: "step3_input"
@@ -27,8 +27,8 @@ simulation:
     nstep: 2500000
     nstdcd: 500
     nstout: 2000
-    cons: HBonds
-    dt: 0.002
+    cons: None
+    dt: 0.001
     mini_nstep: 5000
 
   workload-manager : "slurm"
