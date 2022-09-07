@@ -865,8 +865,15 @@ class CharmmManipulation:
         #except:
         #    print("Masses were left unchanged! HMR not possible, check your output! ")
 
+    def _apply_constraints(self,fout):
 
-    def createTFYamlFile(self):
+        with open(fout,"r") as file:
+            filedata = file.read()
+        filedata = filedata.replace("cons: None","cons: HBonds")
+        with open(fout,"w") as file:
+            file.write(filedata)
+
+    def createTFYamlFile(self, dt = 0.001, nstep = 2500000):
         
         try:
             os.makedirs(f"{self.parent_dir}/config")
@@ -886,8 +893,17 @@ class CharmmManipulation:
                 elif line.strip().startswith("tlc"):
                     new_line = line.replace("UNK",f"{self.resname}")
                     fout.write(new_line)
+                elif line.strip().startswith("dt:"):
+                    new_line = line.replace("TIMESTEP", str(dt))
+                    fout.write(new_line)
+                elif line.strip().startswith("nstep:"):
+                    new_line = line.replace("NUMBEROFSTEPS", str(nstep))
+                    fout.write(new_line)
                 else: 
                     fout.write(line)
 
             fin.close()
             fout.close()
+
+            if dt != 0.001:
+                self._apply_constraints(fout.name)
