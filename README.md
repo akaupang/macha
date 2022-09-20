@@ -5,7 +5,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/johanneskarwou/macha/badges/downloads.svg)](https://anaconda.org/johanneskarwou/macha)
 
 
-## maNUAL chaRMM
+## maNUAL chaRMM (macha)
 
 #### Installation
 
