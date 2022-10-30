@@ -26,7 +26,8 @@ fi
 
 # MBL system modification script directory
 mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
-mblpyname="mbl_system_modifications.py"
+mblpyname_mm="mbl_system_modifications.py"
+mblpyname_qmmm="mbl_qmmm_setup_alpha.py"
 mblconfname="mbl_mod_configuration.yaml"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
@@ -133,11 +134,12 @@ run_a_submenu () {
   echo ""
   echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
-  echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
+  echo " 2 : Modify MM input files with MBL customization hooks (Python 3.9)"
   echo " 3 : Create ligand toppar folders and parameters with local CGenFF"
+  echo " 4 : Create QM/MM input files for MBLs"
   echo ""
   echo "Key  Post-run options"
-  echo " 4 : Apply HMR to OpenMM system"
+  echo " 5 : Apply HMR to OpenMM system"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -173,10 +175,10 @@ run_a_submenu () {
     mblpyloc_def=$(realpath "$mblpyloc_def")
     echo ""
     echo ""
-    echo "Looking for MBL system modification scripts in:"
+    echo "Looking for MBL system modification Python scripts in:"
     echo ${mblpyloc_def}
-    if [[ -f "${mblpyloc_def}/${mblpyname}" && -f "$PWD/${mblconfname}" ]];then
-      python3 -u ${mblpyloc_def}/${mblpyname} $PWD ${mblconfname} &&\
+    if [[ -f "${mblpyloc_def}/${mblpyname_mm}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_mm} $PWD ${mblconfname} &&\
       echo "System modification hooks added to input files"
     else
       echo "MBL system modification scripts not found! Please provide a valid location and set this in the macha script file."
@@ -209,6 +211,20 @@ run_a_submenu () {
     run_a_submenu
 
   elif [ "$submenuoption" = "4" ];then
+    mblpyloc_def=$(realpath "$mblpyloc_def")
+    echo ""
+    echo ""
+    echo "Looking for MBL system modification Python scripts in:"
+    echo ${mblpyloc_def}
+    if [[ -f "${mblpyloc_def}/${mblpyname_qmmm}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_qmmm} $PWD ${mblconfname}
+    else
+      echo "MBL system modification Python scripts not found! Please provide a valid location and set this in the macha script file."
+    fi
+
+    run_a_submenu
+
+  elif [ "$submenuoption" = "5" ];then
     
     ahmrf_str='import os                                                                   \n'
     ahmrf_str+='import sys                                                                  \n'
