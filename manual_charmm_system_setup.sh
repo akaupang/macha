@@ -27,7 +27,7 @@ fi
 # MBL system modification script directory
 mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
 mblpyname_mm="mbl_system_modifications.py"
-mblpyname_qmmm="mbl_qmmm_setup_alpha.py"
+mblpyname_qmmm="mbl_qmmm_setup_v1.py"
 mblconfname="mbl_mod_configuration.yaml"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
@@ -219,7 +219,7 @@ run_a_submenu () {
     if [[ -f "${mblpyloc_def}/${mblpyname_qmmm}" && -f "$PWD/${mblconfname}" ]];then
       python3 -u ${mblpyloc_def}/${mblpyname_qmmm} $PWD ${mblconfname}
     else
-      echo "MBL system modification Python scripts not found! Please provide a valid location and set this in the macha script file."
+      echo "MBL system modification Python scripts or YAML configuration file not found! Please provide valid locations and set these at the top of the macha script file."
     fi
 
     run_a_submenu
