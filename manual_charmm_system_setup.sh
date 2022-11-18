@@ -274,7 +274,12 @@ run_a_submenu () {
     if [ "$key" = "" ]; then
       psf_base="step1_pdbreader"
     elif [ "$key" = "d" ]; then
-      echo "Enter new base name"
+      echo "The following PSF files are available in the source directory:"
+      for entry in "$sys_base"/*.psf; do
+        name_ext=$(basename -- "${entry}")
+        echo "${name_ext%.*}"
+      done
+      echo "Enter PSF base name"
       read psf_base      
       if [ "$psf_base" = "" ]; then
         run_a_submenu
@@ -286,12 +291,13 @@ run_a_submenu () {
     fi
     
     echo ""
-    echo "Provide the base name of the source CRD"
     echo "The following CRD files are available in the source directory:"
     for entry in "$sys_base"/*.crd; do
       name_ext=$(basename -- "${entry}")
       echo "${name_ext%.*}"
     done
+    echo "Enter CRD base name"
+
     read crd_base
     if [ "$crd_base" = "" ]; then
       run_a_submenu
