@@ -269,7 +269,7 @@ run_a_submenu () {
     echo "Provide the base name of the source PSF"
     echo "Press Enter to use 'step1_pdbreader':"
     echo ""
-    echo "or press d     to provide your own name."
+    echo "or press d     to show the available PSF files and provide your own name."
     read -r -s -n 1 key
     if [ "$key" = "" ]; then
       psf_base="step1_pdbreader"
