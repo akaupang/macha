@@ -63,7 +63,7 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     return protein_id, ligand_ids    
 
 class Preparation:
-    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None):
+    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None, small_molecule = False):
         """
         This class prepares everything for further use with CHARMM. The PDB 
         files are sliced into pieces and the ligand is converted to a mol2 file.
@@ -75,6 +75,7 @@ class Preparation:
         self.protein_id = protein_id
         self.resname = str
         self.env: str = env
+        self.small_molecule: bool = small_molecule
 
         self.input_type = None
 
@@ -137,27 +138,6 @@ class Preparation:
         print('* * * End merging * * *')
 
     
-    def createUniqueAtomName(self): # UNUSED FUNCTION
-
-        #self.pdb_file = pm.load_file(f"{self.original_dir}/{self.ligand_id}.pdb")
-
-        ele_count = {}
-        for atom in self.pdb_file:
-            ele = atom.element_name
-            try:
-                ele_count[ele] += 1
-                atom.name = ele+str(ele_count[ele])
-            except KeyError:
-                ele_count[ele] = 0
-
-        self.pdb_file.save(
-            f"{self.original_dir}/{self.ligand_id}.pdb",
-            overwrite=True,
-        )
-
-        print(f'We will create a new pdb file with unique atom names! Use this with caution!!')
-
-
     def _make_folder(self, path):
 
         try:
@@ -181,11 +161,17 @@ class Preparation:
         obConversion = openbabel.OBConversion()
         obConversion.SetInAndOutFormats("pdb", "mol2")
         mol = openbabel.OBMol()
-        obConversion.ReadFile(
-            mol,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-        )
 
+        if self.small_molecule:
+            obConversion.ReadFile(
+                mol,
+                    f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
+            )
+        else:
+            obConversion.ReadFile(
+                mol,
+                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+            )
         # Useful for H-less ligands directly from x-ray crystallography PDBs
         if self.input_type == "allhydrogens":
             pass
@@ -198,11 +184,11 @@ class Preparation:
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
         )
         obConversion.SetInAndOutFormats("pdb", "sdf")
-        mol = openbabel.OBMol()
-        obConversion.ReadFile(
-            mol,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-        )
+        # mol = openbabel.OBMol()
+        # obConversion.ReadFile(
+        #     mol,
+        #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+        # )
         obConversion.WriteFile(
             mol,
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
@@ -518,10 +504,14 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        self.pdb_file[df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                            overwrite=True,
-                        )
+                        if self.small_molecule:
+                            # We copy the pdf file since there shouldn't be any changes
+                            shutil.copy(f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb")
+                        else:
+                            self.pdb_file[df.segid == f"{segid}"].save(
+                                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                                overwrite=True,
+                            )
                     else:
                         # No other segment IDs should be output for the waterbox environment
                         pass
