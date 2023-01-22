@@ -30,3 +30,4 @@ wheels/
 
 # pyenv
 .python-version
+.vscode/settings.json
