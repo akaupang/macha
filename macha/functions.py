@@ -86,13 +86,20 @@ class Preparation:
             # Load the PDB file into ParmEd
             self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-        
+            if self.env == "single_strand":
+                self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+                self.pdb_file = self.pdb_file['A',:,:]  # select only CHAIN A
         else:
-            if self.env == "waterbox":
+            if self.env == "waterbox" or self.env =="double_strand":
                 # Run like normal single ligand
                 self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-
+            elif self.env == "single_strand":
+                self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+                self.pdb_file = self.pdb_file['A',:,:]  # select only CHAIN A
+                print(f"Wir sind hier")
             elif self.env == "complex":
                 # Start the merger function
                 self.mergeToComplex()
@@ -520,7 +527,7 @@ class Preparation:
                 used_segids.append(segid)
                 
                 # WATERBOX ENVIRONMENT
-                if self.env == 'waterbox':
+                if self.env != 'complex':
                     if segid.startswith("HET"):
             
                         # Note the residue name for checks

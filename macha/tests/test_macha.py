@@ -40,7 +40,7 @@ def test_run_macha():
     input_ext = "pdb"  # for testing - should be pdb
     cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 
-    env = "waterbox"
+    env = "single_strand"
 
     preparation = Preparation(
         parent_dir=parent_dir,
@@ -52,8 +52,8 @@ def test_run_macha():
     )
     segids, df = preparation.checkInputType()
     print(segids)
-    # # # Make a Transformato style folder structure below a folder bearing
-    # # # the name of the ligand
+    # # Make a Transformato style folder structure below a folder bearing
+    # # the name of the ligand
     preparation.makeTFFolderStructure()
     segids, used_segids = preparation.createCRDfiles(segids, df)
 
@@ -67,7 +67,6 @@ def test_run_macha():
         original_dir=original_dir,
         resname=preparation.resname,
         env=env,
-        include_ions=False,
     )
     # # # Copy Files from the template folder
     charmmManipulation.copyFiles()
@@ -76,7 +75,7 @@ def test_run_macha():
     # # Run Charmm giving the correct executable path
     charmmManipulation.executeCHARMM(charmm_exe="charmm")
     # # charmmManipulation.applyHMR()
-    # # charmmManipulation.createOpenMMSystem()
+    charmmManipulation.createOpenMMSystem()
     # # charmmManipulation.createTFYamlFile()
 
 
