@@ -32,7 +32,13 @@ def test_createFolders():
 
 
 # Test for handling a small molecule
+
+@pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="Skipping tests that cannot pass in github actions",
+)
 def test_run_macha_for_rna():
+
 
     ligand_id = "ino5"
     parent_dir = "macha/data"

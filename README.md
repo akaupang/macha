@@ -1,8 +1,6 @@
 [//]: # (Badges)
 [![GitHub Actions Build Status](https://github.com/akaupang/macha/workflows/CI/badge.svg)](https://github.com/akaupang/macha/actions)
-[![GitHub Actions Build Status](https://anaconda.org/johanneskarwou/macha/badges/installer/conda.svg)](https://anaconda.org/JohannesKarwou/macha)
-[![Anaconda-Server Badge](https://anaconda.org/johanneskarwou/macha/badges/latest_release_date.svg)](https://anaconda.org/johanneskarwou/macha)
-[![Anaconda-Server Badge](https://anaconda.org/johanneskarwou/macha/badges/downloads.svg)](https://anaconda.org/johanneskarwou/macha)
+[![codecov](https://codecov.io/gh/akuapang/macha/branch/main/graph/badge.svg)](https://codecov.io/gh/akaupang/macha/branch/main)
 
 
 ## maNUAL chaRMM (macha)
