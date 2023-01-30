@@ -596,7 +596,7 @@ class Preparation:
         return segids, used_segids
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, include_ions = True, default_path=""):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, include_ions = True, ion_name = "POT", ion_conc = 0.15, default_path =""):
         """
         CHARMM related files like the toppar file are modified, later the CHARMM executable is
         executed
@@ -607,6 +607,8 @@ class CharmmManipulation:
         self.resname: str = resname
         self.env: str = env
         self.include_ions: bool = include_ions
+        self.ion_name: str = ion_name
+        self.ion_conc: float = ion_conc
         if not default_path:
             self.default_path: str = self.get_default_path()
         else:
@@ -659,11 +661,35 @@ class CharmmManipulation:
 
         return external_toppars
 
+    def _modifyIonsCountFile(self):
+
+        fout = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count_tmp.str", "wt")
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str", "r+") as f:
+            for line in f:
+                if "set pos" in line:
+                    new_line = line.replace("POT", str(self.ion_name))
+                    fout.write(new_line)
+                elif "set conc" in line:
+                    new_line = line.replace("0.15", str(self.ion_conc))
+                    fout.write(new_line)
+                else:
+                    fout.write(line)
+        fout.close()
+
+        shutil.copy(fout.name, f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str")
+        os.remove(fout.name)
+
+        pass
+
+
     def copyFiles(self):
         # Copy files from template path
         # CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
+
+        if self.ion_name != "POT" or self.ion_conc != 0.15:
+            self._modifyIonsCountFile()
 
         # CheckFFT script
         shutil.copy(
