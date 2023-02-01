@@ -828,9 +828,9 @@ runmenu () {
     # Simple SLURM Script based on CG OpenMM scripts
     suif=''
     suif+='#!/bin/bash                                                                     \n'
-    suif+='#SBATCH -p lgpu                                                                 \n'
+    suif+='#SBATCH -p gpu                                                                 \n'
     suif+='#SBATCH --gres=gpu                                                              \n'
-    suif+='#SBATCH --exclude="n[0001-0019]"                                                \n'
+    suif+='#SBATCH --exclude="n[0001-0014]"                                                \n'
     suif+='#SBATCH -J systemlabel                                                          \n'
     suif+='                                                                                \n'
     suif+='source ~/miniconda3/etc/profile.d/conda.sh                                      \n'
