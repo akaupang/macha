@@ -26,7 +26,8 @@ fi
 
 # MBL system modification script directory
 mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
-mblpyname="mbl_system_modifications.py"
+mblpyname_mm="mbl_system_modifications.py"
+mblpyname_qmmm="mbl_qmmm_setup_v2.py"
 mblconfname="mbl_mod_configuration.yaml"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
@@ -133,11 +134,14 @@ run_a_submenu () {
   echo ""
   echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
-  echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
+  echo " 2 : Modify MM input files with MBL customization hooks (Python 3.9)"
   echo " 3 : Create ligand toppar folders and parameters with local CGenFF"
+  echo " 4 : Create sQM/MM input file for MBLs using SCCDFTB"
+  echo " 5 : Create QM/MM input file for MBLs using Q-CHEM"
+  echo " 6 : Create (s)QM/MM input file for MBLs with custom input/output"
   echo ""
   echo "Key  Post-run options"
-  echo " 4 : Apply HMR to OpenMM system"
+  echo " 7 : Apply HMR to OpenMM system"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -173,10 +177,10 @@ run_a_submenu () {
     mblpyloc_def=$(realpath "$mblpyloc_def")
     echo ""
     echo ""
-    echo "Looking for MBL system modification scripts in:"
+    echo "Looking for MBL system modification Python scripts in:"
     echo ${mblpyloc_def}
-    if [[ -f "${mblpyloc_def}/${mblpyname}" && -f "$PWD/${mblconfname}" ]];then
-      python3 -u ${mblpyloc_def}/${mblpyname} $PWD ${mblconfname} &&\
+    if [[ -f "${mblpyloc_def}/${mblpyname_mm}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_mm} $PWD ${mblconfname} &&\
       echo "System modification hooks added to input files"
     else
       echo "MBL system modification scripts not found! Please provide a valid location and set this in the macha script file."
@@ -209,6 +213,151 @@ run_a_submenu () {
     run_a_submenu
 
   elif [ "$submenuoption" = "4" ];then
+    mblpyloc_def=$(realpath "$mblpyloc_def")
+    echo ""
+    echo ""
+    echo "Looking for MBL system modification Python scripts in:"
+    echo ${mblpyloc_def}
+    if [[ -f "${mblpyloc_def}/${mblpyname_qmmm}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_qmmm} $PWD ${mblconfname} "sccdftb"
+    else
+      echo "MBL system modification Python scripts or YAML configuration file not found! Please provide valid locations and set these at the top of the macha script file."
+    fi
+
+    run_a_submenu
+    
+  elif [ "$submenuoption" = "5" ];then
+    mblpyloc_def=$(realpath "$mblpyloc_def")
+    echo ""
+    echo ""
+    echo "Looking for MBL system modification Python scripts in:"
+    echo ${mblpyloc_def}
+    if [[ -f "${mblpyloc_def}/${mblpyname_qmmm}" && -f "$PWD/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_qmmm} $PWD ${mblconfname} "qchem"
+    else
+      echo "MBL system modification Python scripts or YAML configuration file not found! Please provide valid locations and set these at the top of the macha script file."
+    fi
+
+    run_a_submenu
+    
+  elif [ "$submenuoption" = "6" ];then
+    call_path=$PWD
+    echo ""
+    echo ""  
+    echo "Provide a path to the source system folder"
+    echo "Press Enter to use the current directory:"
+    echo ${call_path}
+    echo ""
+    echo "or press d     to provide your own directory."
+    read -r -s -n 1 key
+    if [ "$key" = "" ]; then
+      sys_base=$call_path
+    elif [ "$key" = "d" ]; then
+      echo "Enter new directory"
+      read sys_base      
+      if [ "$sys_base" = "" ]; then
+        run_a_submenu
+      else
+        sys_base=$(realpath "$sys_base")
+        cd $sys_base
+      fi
+    else
+      run_a_submenu
+    fi
+
+    echo ""
+    echo "Provide the base name of the source PSF"
+    echo "Press Enter to use 'step1_pdbreader':"
+    echo ""
+    echo "or press d     to show the available PSF files and provide your own name."
+    read -r -s -n 1 key
+    if [ "$key" = "" ]; then
+      psf_base="step1_pdbreader"
+    elif [ "$key" = "d" ]; then
+      echo "The following PSF files are available in the source directory:"
+      for entry in "$sys_base"/*.psf; do
+        name_ext=$(basename -- "${entry}")
+        echo "${name_ext%.*}"
+      done
+      echo "Enter PSF base name"
+      read psf_base      
+      if [ "$psf_base" = "" ]; then
+        run_a_submenu
+      else
+        psf_base="${psf_base}"
+      fi
+    else
+      run_a_submenu
+    fi
+    
+    echo ""
+    echo "The following CRD files are available in the source directory:"
+    for entry in "$sys_base"/*.crd; do
+      name_ext=$(basename -- "${entry}")
+      echo "${name_ext%.*}"
+    done
+    echo "Enter CRD base name"
+
+    read crd_base
+    if [ "$crd_base" = "" ]; then
+      run_a_submenu
+    else
+      crd_base="${crd_base}"
+    fi
+    
+    echo ""
+    echo "Create input files for sccdftb or qchem?"
+    echo "Press Enter to use 'qchem':"
+    echo ""
+    echo "or press d     to set it manually."
+    read -r -s -n 1 key
+    if [ "$key" = "" ]; then
+      theorylevel="qchem"
+    elif [ "$key" = "d" ]; then
+      echo "Choose theory level (sccdftb or qchem)"
+      read theorylevel      
+      if [ "$theorylevel" = "" ]; then
+        run_a_submenu
+      else
+        theorylevel="${theorylevel}"
+      fi
+    else
+      run_a_submenu
+    fi
+
+    echo ""
+    echo "Provide the base name for the new input files"
+    echo "Press Enter to use 'step1c':"
+    echo ""
+    echo "or press d     to provide your own name."
+    read -r -s -n 1 key
+    if [ "$key" = "" ]; then
+      new_base="step1c"
+    elif [ "$key" = "d" ]; then
+      echo "Enter new base name"
+      read new_base      
+      if [ "$new_base" = "" ]; then
+        run_a_submenu
+      else
+        new_base="${new_base}"
+      fi
+    else
+      run_a_submenu
+    fi
+    
+    mblpyloc_def=$(realpath "$mblpyloc_def")
+    echo ""    
+    echo "Looking for MBL system modification Python scripts in:"
+    echo ${mblpyloc_def}
+    if [[ -f "${mblpyloc_def}/${mblpyname_qmmm}" && -f "${sys_base}/${mblconfname}" ]];then
+      python3 -u ${mblpyloc_def}/${mblpyname_qmmm} ${sys_base} ${mblconfname} ${theorylevel} ${psf_base} ${crd_base} ${new_base}
+    else
+      echo "MBL system modification Python scripts or YAML configuration file not found! Please provide valid locations and set these at the top of the macha script file."
+    fi
+
+    run_a_submenu
+
+  elif [ "$submenuoption" = "7" ];then
     
     ahmrf_str='import os                                                                   \n'
     ahmrf_str+='import sys                                                                  \n'
@@ -679,9 +828,9 @@ runmenu () {
     # Simple SLURM Script based on CG OpenMM scripts
     suif=''
     suif+='#!/bin/bash                                                                     \n'
-    suif+='#SBATCH -p lgpu                                                                 \n'
+    suif+='#SBATCH -p gpu                                                                 \n'
     suif+='#SBATCH --gres=gpu                                                              \n'
-    suif+='#SBATCH --exclude="n[0001-0019]"                                                \n'
+    suif+='#SBATCH --exclude="n[0001-0014]"                                                \n'
     suif+='#SBATCH -J systemlabel                                                          \n'
     suif+='                                                                                \n'
     suif+='source ~/miniconda3/etc/profile.d/conda.sh                                      \n'
