@@ -4,10 +4,10 @@
 
 # SYSTEM VARIABLES
 # Macha python backend base
-macha_py_base="/home/manny/Documents/Work/UiO/Modeling/wien/scripts/bash/macha/macha"
+macha_py_base="/path/to/macha/macha" # Path to python backend
 
 # Charmm binary # Leave empty if the system-wide charmm is to be used
-charmm_bin_man="/home/manny/charmm/bin/charmm"
+charmm_bin_man="" # or "/path/to/charmm/bin/charmm" # if you want to use a particular charmm binary
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
 # Default is the directory created upon creation of a modified OpenMM system,
