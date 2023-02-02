@@ -22,7 +22,9 @@ in the state they were provided in the years 2022-2023.
 It is recommended to set an alias for the script for convenient usage, e.g. in your .bashrc:
 
 \# Make sure that the charmm binary is in the $PATH or you have set a location in the script.
+
 export PATH="/path/to/charmm/bin:$PATH"
 
 \# Create an alias for the script e.g. in your .bashrc .
+
 alias macha="/path/to/manual_charmm_system_setup.sh"
