@@ -63,7 +63,7 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     return protein_id, ligand_ids    
 
 class Preparation:
-    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None, small_molecule = False):
+    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None, small_molecule = False , rna = True):
         """
         This class prepares everything for further use with CHARMM. The PDB 
         files are sliced into pieces and the ligand is converted to a mol2 file.
@@ -76,7 +76,7 @@ class Preparation:
         self.resname = str
         self.env: str = env
         self.small_molecule: bool = small_molecule
-
+        self.rna: bool = rna
         self.input_type = None
 
         # Distinguished treatment if the current ligand is to be merged with a protein
@@ -86,13 +86,20 @@ class Preparation:
             # Load the PDB file into ParmEd
             self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-        
+            if self.env == "single_strand":
+                self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+                self.pdb_file = self.pdb_file['A',:,:]  # select only CHAIN A
         else:
-            if self.env == "waterbox":
+            if self.env == "waterbox" or self.env =="double_strand":
                 # Run like normal single ligand
                 self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-
+            elif self.env == "single_strand":
+                self.pdb_file_orig = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+                self.pdb_file = self.pdb_file['A',:,:]  # select only CHAIN A
+                print(f"Wir sind hier")
             elif self.env == "complex":
                 # Start the merger function
                 self.mergeToComplex()
@@ -351,6 +358,34 @@ class Preparation:
             self.input_type = "missinghydrogens"
             print(f"Some residues appear to lack hydrogens: {*h_miss_res,}")
 
+    def _create_tlc_rna(self):
+        
+        for atom in self.pdb_file.atoms:
+            if atom.residue.name == "G":
+                atom.residue.name = "GUA"
+            elif atom.residue.name == "C":
+                atom.residue.name = "CYT"
+            elif atom.residue.name == "A":
+                atom.residue.name = "ADE"
+            elif atom.residue.name == "U":
+                atom.residue.name = "URA"
+            elif atom.residue.name == "T":
+                atom.residue.name = "THY"
+            elif atom.residue.name == "I":
+                atom.residue.name = "INO"
+        
+        return self.pdb_file
+
+    def _add_segids_rna(self,df):
+
+        chids = set(i.residue.chain for i in self.pdb_file)
+        print(f"Found chain IDs: {chids}")
+        for chain in chids: 
+            for res in self.pdb_file.view[df.chain == f"{chain}"].residues: # produce a select view of this chain's residues using a boolean mask
+                res.segid = f"RNA{chain}"
+        
+        return self.pdb_file
+
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
         # not contain segids, but only chain ids, ensuring that segids can be
@@ -453,13 +488,17 @@ class Preparation:
         # have chain IDs, while CHARMM PDB files contain the segid column, but
         # lack chain IDs. 
         
-        # Count the segids in the PDB file (if any)
+        # # Count the segids in the PDB file (if any)
         segids = set(i.residue.segid for i in self.pdb_file)
         
+        if self.rna:
+            self.pdb_file = self._add_segids_rna(df)
+            self.pdb_file = self._create_tlc_rna()
+            segids = set(i.residue.segid for i in self.pdb_file)
+            df = self.pdb_file.to_dataframe()
         # For canonical/MAESTRO-derived PDB files containing chain IDs
-        if segids == {''}: # empty set of segids
+        elif segids == {''}: # empty set of segids
             print(f"Processing a canonical/Maestro based pdb file (without segids)")
-            
             # Check for hydrogens
             # set self.input_type
             self._check_for_hydrogens()
@@ -469,7 +508,6 @@ class Preparation:
             # Update the dataframe and segid list
             df = self.pdb_file.to_dataframe()
             segids = set(i.residue.segid for i in self.pdb_file)
-
         # For CHARMM-GUI generated PDB files
         else:  
             print(f"Processing a CHARMM PDB file (with segids)")
@@ -489,13 +527,13 @@ class Preparation:
                 used_segids.append(segid)
                 
                 # WATERBOX ENVIRONMENT
-                if self.env == 'waterbox':
+                if self.env != 'complex':
                     if segid.startswith("HET"):
             
                         # Note the residue name for checks
                         self.resname = self.pdb_file[df.segid == f"{segid}"].residues[0].name
                         # resname should be a 3 or 4 letters code
-                        assert len(self.resname) < 5
+                        # assert len(self.resname) < 5
 
                         self._make_folder(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
@@ -512,9 +550,12 @@ class Preparation:
                                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                                 overwrite=True,
                             )
-                    else:
-                        # No other segment IDs should be output for the waterbox environment
-                        pass
+                    elif segid.startswith("RNA"):
+
+                        self.pdb_file[df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                            overwrite=True,
+                        )
 
                 # COMPLEX ENVIRONMENT
                 elif self.env == 'complex':
@@ -555,7 +596,7 @@ class Preparation:
         return segids, used_segids
 
 class CharmmManipulation:
-    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, include_ions = True, default_path=""):
+    def __init__(self, parent_dir, ligand_id, original_dir, resname, env, include_ions = True, ion_name = "POT", ion_conc = 0.15, default_path =""):
         """
         CHARMM related files like the toppar file are modified, later the CHARMM executable is
         executed
@@ -566,6 +607,8 @@ class CharmmManipulation:
         self.resname: str = resname
         self.env: str = env
         self.include_ions: bool = include_ions
+        self.ion_name: str = ion_name
+        self.ion_conc: float = ion_conc
         if not default_path:
             self.default_path: str = self.get_default_path()
         else:
@@ -618,11 +661,35 @@ class CharmmManipulation:
 
         return external_toppars
 
+    def _modifyIonsCountFile(self):
+
+        fout = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count_tmp.str", "wt")
+        with open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str", "r+") as f:
+            for line in f:
+                if "set pos" in line:
+                    new_line = line.replace("POT", str(self.ion_name))
+                    fout.write(new_line)
+                elif "set conc" in line:
+                    new_line = line.replace("0.15", str(self.ion_conc))
+                    fout.write(new_line)
+                else:
+                    fout.write(line)
+        fout.close()
+
+        shutil.copy(fout.name, f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str")
+        os.remove(fout.name)
+
+        pass
+
+
     def copyFiles(self):
         # Copy files from template path
         # CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
+
+        if self.ion_name != "POT" or self.ion_conc != 0.15:
+            self._modifyIonsCountFile()
 
         # CheckFFT script
         shutil.copy(
@@ -644,7 +711,10 @@ class CharmmManipulation:
     def modifyStep1(self, segids):
 
         # Append the ligand toppar to the CHARMM toppar stream
-        self._appendToppar()
+        try:
+            self._appendToppar()
+        except TypeError:
+            print("Won't add a ligand stream file, assuming it's a RNA strand")
 
         correction_on = False
 

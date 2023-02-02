@@ -32,53 +32,57 @@ def test_createFolders():
 
 
 # Test for handling a small molecule
+
 @pytest.mark.skipif(
     os.getenv("CI") == "true",
     reason="Skipping tests that cannot pass in github actions",
 )
-def test_run_macha():
+def test_run_macha_for_rna():
 
-    ligand_id = "smallMolecule"
+
+    ligand_id = "ino5"
     parent_dir = "macha/data"
     original_dir = "original"
     input_ext = "pdb"  # for testing - should be pdb
     cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 
-    env = "waterbox"
+    for env in ["single_strand","double_strand"]:
+        preparation = Preparation(
+            parent_dir=parent_dir,
+            ligand_id=ligand_id,
+            original_dir=original_dir,
+            env=env,
+            rna = True,
 
-    preparation = Preparation(
-        parent_dir=parent_dir,
-        ligand_id=ligand_id,
-        original_dir=original_dir,
-        env=env,
-        small_molecule = True,
-    )
-    segids, df = preparation.checkInputType()
+        )
+        segids, df = preparation.checkInputType()
+        print(segids)
+        # # Make a Transformato style folder structure below a folder bearing
+        # # the name of the ligand
+        preparation.makeTFFolderStructure()
+        segids, used_segids = preparation.createCRDfiles(segids, df)
 
-    # Make a Transformato style folder structure below a folder bearing
-    # the name of the ligand
-    preparation.makeTFFolderStructure()
-    segids, used_segids = preparation.createCRDfiles(segids, df)
-    print(segids,used_segids)
-    # # Get the toppar stream from a local CGenFF binary
-    preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
+        print(segids,used_segids)
+        # # # # Get the toppar stream from a local CGenFF binary
+        # preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
-    charmmManipulation = CharmmManipulation(
-        parent_dir=parent_dir,
-        ligand_id=ligand_id,
-        original_dir=original_dir,
-        resname=preparation.resname,
-        env=env,
-        include_ions=False,
-    )
-    # Copy Files from the template folder
-    charmmManipulation.copyFiles()
-    # Modify step1_pdbreader.inp to read in correct amount of chains/residues
-    charmmManipulation.modifyStep1(used_segids)
-    # Run Charmm giving the correct executable path
-    # charmmManipulation.executeCHARMM(charmm_exe="charmm")
-    # charmmManipulation.applyHMR()
-    # charmmManipulation.createOpenMMSystem()
-    # charmmManipulation.createTFYamlFile()
+        charmmManipulation = CharmmManipulation(
+            parent_dir=parent_dir,
+            ligand_id=ligand_id,
+            original_dir=original_dir,
+            resname=preparation.resname,
+            env=env,
+            ion_name = "SOD",
+            ion_conc = 1.0
+        )
+        # # # Copy Files from the template folder
+        charmmManipulation.copyFiles()
+        # Modify step1_pdbreader.inp to read in correct amount of chains/residues
+        charmmManipulation.modifyStep1(used_segids)
+        # # Run Charmm giving the correct executable path
+        charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        # # charmmManipulation.applyHMR()
+        charmmManipulation.createOpenMMSystem()
+        # charmmManipulation.createTFYamlFile()
 
 

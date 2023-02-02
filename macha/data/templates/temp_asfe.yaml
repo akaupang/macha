@@ -30,6 +30,7 @@ simulation:
     cons: None
     dt: TIMESTEP
     mini_nstep: 5000
+    vdw: "switch"
 
   workload-manager : "slurm"
   GPU: True
