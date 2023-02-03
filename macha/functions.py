@@ -63,7 +63,7 @@ def checkInput(parent_dir= ".", original_dir="original", protein_name=None, inpu
     return protein_id, ligand_ids    
 
 class Preparation:
-    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None, small_molecule = False , rna = True):
+    def __init__(self, parent_dir, original_dir, ligand_id, env, protein_id=None, small_molecule = False , rna = False):
         """
         This class prepares everything for further use with CHARMM. The PDB 
         files are sliced into pieces and the ligand is converted to a mol2 file.
