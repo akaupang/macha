@@ -6,6 +6,7 @@ dependencies:
   # Base depends
   - parmed
   - openbabel
+  - natsort
     # Testing
   - pytest
   - pytest-cov
