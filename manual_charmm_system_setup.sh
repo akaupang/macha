@@ -1,14 +1,31 @@
 #!/bin/bash
 
-# System variables
+###############################################################################
+
+# SYSTEM VARIABLES
 # Macha python backend base
-macha_py_base="/home/manny/Documents/Work/UiO/Modeling/wien/scripts/bash/macha/macha"
+macha_py_base="/path/to/macha/macha" # Path to python backend
 
-# CHARMM binary
-# NOTE - if a path to the CHARMM binary
-# Check if "charmm" is in the PATH
-charmm_bin_man="/home/manny/charmm/bin/charmm"
+# Charmm binary # Leave empty if the system-wide charmm is to be used
+charmm_bin_man="" # or "/path/to/charmm/bin/charmm" # if you want to use a particular charmm binary
 
+# Location of CHARMM-GUI-provided OpenMM Python scripts
+# Default is the directory created upon creation of a modified OpenMM system,
+# that is the original "openmm" directory
+cgommpyloc_def="$PWD/prev_openmm_1"
+
+# The name of the internally generated step 3.1 CHARMM input script file is
+ommcname="step3.1_omm"
+
+# The name of the internally generated HMR application Python script (which uses ParmEd) is
+ahmrf_py="apply_HMR_with_ParmEd.py"
+
+###############################################################################
+    
+###############################################################################
+
+# If no manual charmm binary location is given
+# check if "charmm" is in the PATH
 if [ "${charmm_bin_man}" = "" ];then
   if ! command -v charmm &> /dev/null; then
     echo "The CHARMM binary must be available to this tool, either through"
@@ -24,21 +41,6 @@ else
   charmm_bin=${charmm_bin_man}
 fi
 
-# MBL system modification script directory
-mblpyloc_def="/home/manny/Documents/Work/UiO/Modeling/wien/proteins/mbls/patches/python"
-mblpyname="mbl_system_modifications.py"
-mblconfname="mbl_mod_configuration.yaml"
-
-# Location of CHARMM-GUI-provided OpenMM Python scripts
-# Default is the directory created upon creation of a modified OpenMM system,
-# that is the original "openmm" directory
-cgommpyloc_def="$PWD/prev_openmm_1"
-
-# The name of the internally generated step 3.1 CHARMM input script file is
-ommcname="step3.1_omm"
-
-# The name of the internally generated HMR application Python script (which uses ParmEd) is
-ahmrf_py="apply_HMR_with_ParmEd.py"
 
 # TRANSFORMATO_RELATED
 # ALL FUNCTIONS IN PYTHON BACKEND
@@ -61,9 +63,7 @@ run_t_submenu () {
   echo ""
   echo "Key"
   echo " 1 : Run Transformato system creation (Python 3.9)"
-  echo " 2 : Option2"
-  echo " 3 : Option3"
-  echo " 4 : Option4"
+  echo " 2 : "
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -109,8 +109,8 @@ run_t_submenu () {
     # Return to Transformato submenu
     run_t_submenu
 
-  elif [ "$submenuoption" = "2" ]; then
-    run_t_submenu
+  #elif [ "$submenuoption" = "2" ]; then
+  #  run_t_submenu
 
   elif [ "$submenuoption" = "r" ];then
     runmenu
@@ -126,6 +126,7 @@ run_t_submenu () {
   fi
 }
 
+
 # Advanced submenu
 run_a_submenu () {
   echo ""
@@ -133,11 +134,13 @@ run_a_submenu () {
   echo ""
   echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
-  echo " 2 : Modify input files with MBL customization hooks (Python 3.9)"
-  echo " 3 : Create ligand toppar folders and parameters with local CGenFF"
+  echo " 2 : Create ligand toppar folders and parameters with local CGenFF"
+  echo " 3 : "
   echo ""
   echo "Key  Post-run options"
   echo " 4 : Apply HMR to OpenMM system"
+  echo " 5 : "
+  echo " 6 : "
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -170,21 +173,6 @@ run_a_submenu () {
     run_a_submenu
 
   elif [ "$submenuoption" = "2" ];then
-    mblpyloc_def=$(realpath "$mblpyloc_def")
-    echo ""
-    echo ""
-    echo "Looking for MBL system modification scripts in:"
-    echo ${mblpyloc_def}
-    if [[ -f "${mblpyloc_def}/${mblpyname}" && -f "$PWD/${mblconfname}" ]];then
-      python3 -u ${mblpyloc_def}/${mblpyname} $PWD ${mblconfname} &&\
-      echo "System modification hooks added to input files"
-    else
-      echo "MBL system modification scripts not found! Please provide a valid location and set this in the macha script file."
-    fi
-
-    run_a_submenu
-
-  elif [ "$submenuoption" = "3" ];then
     echo ""
     echo "Provide a path to the ligands in MOL2 format"
     read lig_path
@@ -208,8 +196,8 @@ run_a_submenu () {
     cd call_path
     run_a_submenu
 
+
   elif [ "$submenuoption" = "4" ];then
-    
     ahmrf_str='import os                                                                   \n'
     ahmrf_str+='import sys                                                                  \n'
     ahmrf_str+='import shutil                                                               \n'
@@ -671,6 +659,7 @@ runmenu () {
       fi
     done  
     runmenu
+
 ###############################################################################
 
   elif [ "$menuoption" = "8" ]; then
@@ -679,9 +668,9 @@ runmenu () {
     # Simple SLURM Script based on CG OpenMM scripts
     suif=''
     suif+='#!/bin/bash                                                                     \n'
-    suif+='#SBATCH -p lgpu                                                                 \n'
+    suif+='#SBATCH -p gpu                                                                 \n'
     suif+='#SBATCH --gres=gpu                                                              \n'
-    suif+='#SBATCH --exclude="n[0001-0019]"                                                \n'
+    suif+='#SBATCH --exclude="n[0001-0014]"                                                \n'
     suif+='#SBATCH -J systemlabel                                                          \n'
     suif+='                                                                                \n'
     suif+='source ~/miniconda3/etc/profile.d/conda.sh                                      \n'
@@ -872,4 +861,3 @@ runmenu () {
 # This builds the main menu and routes the user to the function selected.
 
 runmenu
-
