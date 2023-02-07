@@ -142,7 +142,7 @@ class Preparation:
         # Load the protein
         print(f"Processing protein (input typing, segid addition, HETx removal)")
         self.pdb_file = pm.load_file(
-            f"{self.original_dir}/{self.protein_id}.pdb", structure=True
+            f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb", structure=True
         )
 
         # What kind of protein file has been provided?
@@ -157,7 +157,7 @@ class Preparation:
         # Load the ligand
         print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
         self.pdb_file = pm.load_file(
-            f"{self.original_dir}/{self.ligand_id}.pdb", structure=True
+            f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb", structure=True
         )
 
         # Add segids to ligand PDB object if there are none
