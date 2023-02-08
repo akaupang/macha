@@ -218,6 +218,7 @@ class Preparation:
 
         assert (mol.NumResidues()) == 1
         
+        # Write new files
         # Convert mol from PDB to MOL2
         obConversion.SetInAndOutFormats("pdb", "mol2")
         obConversion.WriteFile(
@@ -234,24 +235,24 @@ class Preparation:
         
     def _modify_resname_in_stream(self):
 
-        fin = open(
+        stream_in = open(
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
             "rt",
         )
-        fout = open(
+        stream_out = open(
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
             "wt",
         )
-        for line in fin:
+        for line in stream_in:
             if line.startswith("RESI"):
-                fout.write(line.replace(line.split()[1], self.resname))
+                stream_out.write(line.replace(line.split()[1], self.resname))
             else:
-                fout.write(line)
+                stream_out.write(line)
 
-        fin.close()
-        fout.close()
+        stream_in.close()
+        stream_out.close()
 
-        shutil.copy(fout.name, fin.name)
+        shutil.copy(stream_out.name, stream_in.name)
 
     def getTopparFromLocalCGenFF(
         self,
@@ -270,7 +271,7 @@ class Preparation:
                 print(f"This function requires cgenff.\n"\
                       f"Please install it in the active environment or point the routine\n"\
                       f"to the right path using the key cgenff_path='/path/to/cgenff' ."
-                      )
+                )
             else:
                 cgenff_bin = cgenff_path
         else:
@@ -302,10 +303,11 @@ class Preparation:
 
             # Evaluate the subprocess return code
             if cgenff_output.returncode == 1:
-                print(f"CGenFF returned an error after being called with:\n")
-                print(" ".join(cgenff_output.args))
-                print(cgenff_output.stdout)
-                print(cgenff_output.stderr)
+                print(f"CGenFF returned an error after being called with:\n"\
+                      f"{' '.join(cgenff_output.args)}\n"\
+                      f"{cgenff_output.stdout}\n"\
+                      f"{cgenff_output.stderr}\n"
+                )
             else:
                 print(f"CGenFF executed successfully")
                 # print(cgenff_output.stdout)
