@@ -50,7 +50,7 @@ def checkInput(
         No protein was specified for ligand exchange with multiple ligands.
         The input is thus assumed to consist either of complexes from which to create
         waterboxes + complexes, OR of single ligands from which to create waterboxes
-        (use the -nc switch for efficiency).
+        (if the latter is the case, use the -nc switch for efficiency).
         """
         )
 
@@ -192,21 +192,24 @@ class Preparation:
     def _create_mol2_file(self):
 
         print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
-
         obConversion = openbabel.OBConversion()
-        obConversion.SetInAndOutFormats("pdb", "mol2")
         mol = openbabel.OBMol()
-
+                
+        # Read a ligand PDB file to OpenBabel object mol
+        # From the "original" directory
         if self.small_molecule:
             obConversion.ReadFile(
                 mol,
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
             )
+        # From the "ligandID/environment/residueName" directory, e.g. "cpd10/waterbox/dy6/dy6.pdb"
         else:
             obConversion.ReadFile(
                 mol,
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
             )
+        
+        # Check for the presence of hydrogens in the ligand    
         # Useful for H-less ligands directly from x-ray crystallography PDBs
         if self.input_type == "allhydrogens":
             pass
@@ -214,21 +217,21 @@ class Preparation:
             mol.AddHydrogens()
 
         assert (mol.NumResidues()) == 1
+        
+        # Convert mol from PDB to MOL2
+        obConversion.SetInAndOutFormats("pdb", "mol2")
         obConversion.WriteFile(
             mol,
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
         )
+        
+        # Convert mol from PDB to SDF
         obConversion.SetInAndOutFormats("pdb", "sdf")
-        # mol = openbabel.OBMol()
-        # obConversion.ReadFile(
-        #     mol,
-        #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-        # )
         obConversion.WriteFile(
             mol,
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
         )
-
+        
     def _modify_resname_in_stream(self):
 
         fin = open(
@@ -264,11 +267,10 @@ class Preparation:
         if cgenff_path == False:
             cgenff_path = shutil.which("cgenff")
             if cgenff_path == None:
-                print("This function requires cgenff.")
-                print(
-                    "Please install it in the active environment or point the routine"
-                )
-                print("to the right path using the key cgenff_path='/path/to/cgenff' .")
+                print(f"This function requires cgenff.\n"\
+                      f"Please install it in the active environment or point the routine\n"\
+                      f"to the right path using the key cgenff_path='/path/to/cgenff' ."
+                      )
             else:
                 cgenff_bin = cgenff_path
         else:

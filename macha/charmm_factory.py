@@ -1,6 +1,5 @@
 import natsort
 
-
 class CharmmFactory:
     def __init__():
         pass
@@ -38,7 +37,7 @@ read coor unit 10 card resid
         """
             elif segi == "HETA":
                 header += f"""
-bomlev -1  ! not ideal but necessary for taking three membered rings into account
+bomlev -1  ! not ideal but necessary for taking three-membered rings into account
 ! Read {segi.upper()}
 open read card unit 10 name {segi.lower()}.crd
 read sequence coor card unit 10 resid
