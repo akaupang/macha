@@ -8,6 +8,7 @@ class CharmmFactory:
 
         header = ""
         for segi in natsort.natsorted(segids):
+            # RNA
             if segi.startswith("RNA"):
                 header += f"""
 ! Read {segi.upper()}
@@ -18,13 +19,17 @@ generate {segi.upper()} setup warn first 5TER last 3TER
 open read unit 10 card name {segi.lower()}.crd
 read coor unit 10 card resid
         """
+        
+            # PROTEIN
             elif env != "waterbox" and segi not in [
                 "HETA",
-                "IONS",
-                "SOLV",
+                "HETB",
+                "HETC",
                 "WATA",
                 "WATB",
                 "WATC",
+                "IONS",
+                "SOLV",
             ]:
                 header += f"""
 ! Read {segi.upper()}
@@ -35,7 +40,8 @@ generate {segi.upper()} setup warn first NTER last CTER
 open read unit 10 card name {segi.lower()}.crd
 read coor unit 10 card resid
         """
-            elif segi == "HETA":
+            # HET SEGIDS
+            elif segi.startswith("HET"): # segi == "HETA": # REDO FOR GENERAL HET*
                 header += f"""
 bomlev -1  ! not ideal but necessary for taking three-membered rings into account
 ! Read {segi.upper()}

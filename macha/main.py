@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 25 12:03:58 2022
+Created in February 2023
 
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
@@ -12,11 +12,11 @@ from functions import checkInput, Preparation, CharmmManipulation
 ### VARIABLES/SETTINGS
 ################################################################################
 
-parent_dir = "."
+parent_dir = "data"
 original_dir = "original"
-input_ext = "pdb"  # exclusive support for PDB
-protein_name = "protein" # -> protein.pdb
-cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
+input_ext = "pdb"         # exclusive support for PDB
+protein_name = "protein"  # -> protein.pdb
+cgenff_path = ""          # MUST BE SET BY USER
 
 ################################################################################
 # MAIN (WORK)
@@ -24,7 +24,11 @@ cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cge
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
 # If protein.pdb is found, assume ligands alone.
-protein_id, ligand_ids = checkInput(parent_dir = parent_dir, original_dir = original_dir, protein_name = protein_name)
+protein_id, ligand_ids = checkInput(
+    parent_dir = parent_dir, 
+    original_dir = original_dir, 
+    protein_name = protein_name
+    )
 
 # ARGUMENT HANDLING
 # Initialize
@@ -56,18 +60,20 @@ for ligand_id in ligand_ids:
             parent_dir=parent_dir,
             original_dir=original_dir,
             ligand_id=ligand_id,
-            protein_id=protein_id,
             env=env,
+            protein_id=protein_id,
+            small_molecule=False,
+            rna=False,
         )
 
         # Check input types
-        segids, df = preparation.checkInputType()
+        segids, pm_obj_df = preparation.checkInputType()
 
         # Make a Transformato style folder structure
         preparation.makeTFFolderStructure()
 
         # Create CHARMM Coordinate files
-        segids, used_segids = preparation.createCRDfiles(segids, df)
+        segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
         print("The following segment IDs were found/assigned:")
         print(*segids)
         print("The following segment IDs were used/not excluded:")
@@ -94,6 +100,12 @@ for ligand_id in ligand_ids:
 
         # Run Charmm giving the correct executable path
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        
+        # Convert the CHARMM system to an OpenMM system
         charmmManipulation.createOpenMMSystem()
+        
+        # Apply HMR to the OpenMM system
         charmmManipulation.applyHMR()
-        charmmManipulation.createTFYamlFile(dt=0.002)
+        
+        # Create YAML file for ASFE simulations using TF (requires ./parent/config directory)
+        charmmManipulation.createTFYamlFile(dt=0.002, nstep=2500000)

@@ -66,9 +66,9 @@ def checkInput(
             ligand_ids.append(lig_id)  #
     return protein_id, ligand_ids
 
-
+###############################################################################
 class Preparation:
-
+###############################################################################
     def __init__(
         self,
         parent_dir,
@@ -78,6 +78,7 @@ class Preparation:
         protein_id=None,
         small_molecule=False,
         rna=False,
+        system_ph=7.4
     ):
 
         """
@@ -94,82 +95,45 @@ class Preparation:
         self.small_molecule: bool = small_molecule
         self.rna: bool = rna
         self.input_type = None
+        self.system_ph = system_ph
 
         # Distinguished treatment if the current ligand is to be merged with a protein
 
         if self.protein_id == None:
             # For complexes->waterbox+complex or single ligands->waterbox
             # Load the PDB file into ParmEd
-            self.pdb_file_orig = (
+            self.pm_obj_orig = (
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             )
-            self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+            self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
             if self.env == "single_strand":
-                self.pdb_file_orig = (
+                self.pm_obj_orig = (
                     f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 )
-                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-                self.pdb_file = self.pdb_file["A", :, :]  # select only CHAIN A
+                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
+                self.pm_obj = self.pm_obj["A", :, :]  # select only CHAIN A 
+                                                          # TODO: MAKE THIS MORE ROBUST
         else:
             if self.env == "waterbox" or self.env == "double_strand":
                 # Run like normal single ligand
-                self.pdb_file_orig = (
+                self.pm_obj_orig = (
                     f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 )
-                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
+                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
+                
             elif self.env == "single_strand":
-                self.pdb_file_orig = (
+                self.pm_obj_orig = (
                     f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
                 )
-                self.pdb_file = pm.load_file(self.pdb_file_orig, structure=True)
-                self.pdb_file = self.pdb_file["A", :, :]  # select only CHAIN A
-                print(f"Wir sind hier")
+                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
+                self.pm_obj = self.pm_obj["A", :, :]  # select only CHAIN A
+
             elif self.env == "complex":
                 # Start the merger function
                 self.mergeToComplex()
 
             else:
                 sys.exit(f"Unrecognized environment: {self.env}")
-
-    def mergeToComplex(self):
-        print("* * * Start merging * * *")
-        # Here, it is practical to borrow the "self.pdb_file" temporarily
-        # for both the input protein and later for the ligand. This solution
-        # benefits from the fact that most of the internal functions in this
-        # class already work on this object. The merge function will in the end
-        # restore "self.pdb_file" as the complex.
-
-        # Load the protein
-        print(f"Processing protein (input typing, segid addition, HETx removal)")
-        self.pdb_file = pm.load_file(
-            f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb", structure=True
-        )
-
-        # What kind of protein file has been provided?
-        # Remember: segids will be added if there are none
-        segids, df = self.checkInputType()
-
-        # Get the parts of the parmed object (protein) that does not contain
-        # "HET" in the segid column
-        # Note the tilde to invert the boolean mask!
-        apo_pdb = self.pdb_file[~df.segid.str.contains("HET")]
-
-        # Load the ligand
-        print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
-        self.pdb_file = pm.load_file(
-            f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb", structure=True
-        )
-
-        # Add segids to ligand PDB object if there are none
-        segids, df = self.checkInputType()
-
-        lig_pdb = self.pdb_file
-
-        # Overwrite the self.pdb_file by joining the structures
-        # (no reordering to a typical PROA, HETA, IONS, WAT/SOLV)
-        self.pdb_file = apo_pdb + lig_pdb
-
-        print("* * * End merging * * *")
 
     def _make_folder(self, path):
 
@@ -181,158 +145,23 @@ class Preparation:
             if not os.path.isdir(path):
                 raise
 
-    def makeTFFolderStructure(self):
-        self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
-        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
-        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
-        self._make_folder(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/"
-        )
-
-    def _create_mol2_file(self):
-
-        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
-        obConversion = openbabel.OBConversion()
-        mol = openbabel.OBMol()
-                
-        # Read a ligand PDB file to OpenBabel object mol
-        # From the "original" directory
-        if self.small_molecule:
-            obConversion.ReadFile(
-                mol,
-                f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
-            )
-        # From the "ligandID/environment/residueName" directory, e.g. "cpd10/waterbox/dy6/dy6.pdb"
-        else:
-            obConversion.ReadFile(
-                mol,
-                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-            )
-        
-        # Check for the presence of hydrogens in the ligand    
-        # Useful for H-less ligands directly from x-ray crystallography PDBs
-        if self.input_type == "allhydrogens":
-            pass
-        elif self.input_type == "missinghydrogens":
-            mol.AddHydrogens()
-
-        assert (mol.NumResidues()) == 1
-        
-        # Write new files
-        # Convert mol from PDB to MOL2
-        obConversion.SetInAndOutFormats("pdb", "mol2")
-        obConversion.WriteFile(
-            mol,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
-        )
-        
-        # Convert mol from PDB to SDF
-        obConversion.SetInAndOutFormats("pdb", "sdf")
-        obConversion.WriteFile(
-            mol,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
-        )
-        
-    def _modify_resname_in_stream(self):
-
-        stream_in = open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
-            "rt",
-        )
-        stream_out = open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
-            "wt",
-        )
-        for line in stream_in:
-            if line.startswith("RESI"):
-                stream_out.write(line.replace(line.split()[1], self.resname))
-            else:
-                stream_out.write(line)
-
-        stream_in.close()
-        stream_out.close()
-
-        shutil.copy(stream_out.name, stream_in.name)
-
-    def getTopparFromLocalCGenFF(
-        self,
-        cgenff_path=False,
-    ):
-        cgenff_bin = None
-        cgenff_output = None
-
-        # CGenFF needs a mol2 file as input file
-        self._create_mol2_file()
-
-        # If no particular path is given, check whether CGenFF is available
-        if cgenff_path == False:
-            cgenff_path = shutil.which("cgenff")
-            if cgenff_path == None:
-                print(f"This function requires cgenff.\n"\
-                      f"Please install it in the active environment or point the routine\n"\
-                      f"to the right path using the key cgenff_path='/path/to/cgenff' ."
-                )
-            else:
-                cgenff_bin = cgenff_path
-        else:
-            cgenff_bin = cgenff_path
-
-        # CGenFF exists - start program
-        if cgenff_bin != None:
-
-            # Remove stream file otherwise CGenFF will append the new one at
-            # the end of the old one
-            stream_file = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
-            if os.path.isfile(stream_file):
-                os.remove(stream_file)
-
-            # Run CGenFF
-            ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}"
-
-            cgenff_output = subprocess.run(
-                [cgenff_bin]
-                + [f"{ligand_path}.mol2"]
-                + ["-v"]
-                + ["-f"]
-                + [f"{stream_file}"]
-                + ["-m"]
-                + [f"{ligand_path}.log"],
-                capture_output=True,
-                text=True,
-            )
-
-            # Evaluate the subprocess return code
-            if cgenff_output.returncode == 1:
-                print(f"CGenFF returned an error after being called with:\n"\
-                      f"{' '.join(cgenff_output.args)}\n"\
-                      f"{cgenff_output.stdout}\n"\
-                      f"{cgenff_output.stderr}\n"
-                )
-            else:
-                print(f"CGenFF executed successfully")
-                # print(cgenff_output.stdout)
-                # print(cgenff_output.stderr)
-
-        self._modify_resname_in_stream()
-
-        return cgenff_output
-
     def _remove_lp(self):
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
         lps = []
-        for atom in self.pdb_file:
-            if (atom.name.startswith("LP")) or (atom.name.startswith("Lp")):
-                print(f"We will remove {atom}, {atom.idx} ")
+        for atom in self.pm_obj:
+            if atom.name.upper().startswith("LP"): # Check for lp, Lp, lP, LP
+                print(f"We will remove lonepair {atom.idx} {atom.name}, {atom}")
                 lps.append(atom.idx)
 
         for i in range(len(lps)):
-            self.pdb_file.strip(f"@{lps[i]+1-i}")
+            self.pm_obj.strip(f"@{lps[i]+1-i}")
 
-        return self.pdb_file
+        return self.pm_obj
 
     def _check_ionizable(self):
-        # A preliminary list of residue names for titrable residues that indicate that the user has set them
+        # A preliminary list of residue names for titrable residues that indicate 
+        # that the user has set them manually appears below
         # AMBER names will be converted to CHARMM names, no questions asked.
         # TODO This list should be expanded to be comprehensive
         ionized_res = [
@@ -351,8 +180,8 @@ class Preparation:
         for (
             res
         ) in (
-            self.pdb_file.residues
-        ):  # produce a select view of this chain using a boolean mask
+            self.pm_obj.residues
+        ):  
             if res.name in ionized_res:
                 # Harmonize to CHARMM names (from AMBER names)
                 # TODO This section should be expanded to be comprehensive
@@ -371,34 +200,262 @@ class Preparation:
                 # TODO A lookup using PROPKA or another solution could be of interest here
                 res.name = "HSD"  # ATTENTION!! Here we make all HIS to HSD
 
-        return self.pdb_file
+        return self.pm_obj
 
-    def _check_for_hydrogens(self):
-        # Do hydrogens cover all residues?
-        h_cont_res = [
-            res.name
-            for res in self.pdb_file.residues
-            if any([True for atm in res.atoms if atm.element_name == "H"])
-        ]
-        no_h_res = [
-            res.name
-            for res in self.pdb_file.residues
-            if any([True for atm in res.atoms if atm.element_name != "H"])
-        ]
 
-        h_miss_res = list(np.setdiff1d(no_h_res, h_cont_res))
+    def mergeToComplex(self):
+        print("* * * Begin merge to complex * * *")
+        # Here, it is practical to borrow the "self.pm_obj" temporarily
+        # for both the input protein and later for the ligand. This solution
+        # benefits from the fact that most of the internal functions in this
+        # class already work on this object. The merge function will in the end
+        # restore "self.pm_obj" as the complex.
 
-        # if any([True for ele in self.pdb_file.atoms if ele.element_name == "H"]):
-        if len(h_cont_res) == len(no_h_res):
-            self.input_type = "allhydrogens"
-            print("All residues appear to be fully hydrogenated")
+        # Load the protein
+        print(f"Processing protein (input typing, segid addition, HETx removal)")
+        self.pm_obj = pm.load_file(
+            f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb", structure=True
+        )
+
+        # What kind of protein PDB file has been provided?
+        # Remember: segids will be added if there are none
+        segids, pm_obj_df = self.checkInputType()
+
+        # Get the parts of the ParmEd object (here, the protein) that does not 
+        # contain "HET" in the segid column. No segids other than HET are excluded!
+        # Note the tilde to invert the boolean mask!
+        # Copy the resulting ParmEd object
+        apo_protein_pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
+
+        # Load the ligand, overwriting the common ParmEd object
+        print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
+        self.pm_obj = pm.load_file(
+            f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb", structure=True
+        )
+
+        # Add segids to ligand ParmEd object if there are none
+        segids, pm_obj_df = self.checkInputType()
+
+        # Copy the ligand ParmEd object
+        ligand_pm_obj = self.pm_obj
+
+        # Overwrite the self.pm_obj by joining the copied protein and ligand
+        # ParmEd objects.
+        # NOTE: No reordering to a typical PROA, HETA, IONS, WAT/SOLV order
+        # is performed
+        self.pm_obj = apo_protein_pm_obj + ligand_pm_obj
+
+        print("* * * End merge * * *")
+
+    def makeTFFolderStructure(self):
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
+        self._make_folder(
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/"
+        )
+
+    def checkInputType(self):
+        # Since this function runs right after the __init__ function,
+        # ParmEd objects of several origins need to be handled:
+        # Ligands (or RNA) for waterboxes and ligands during mergetocomplex
+        # Proteins during mergetocomplex
+        # Complexes after mergetocomplex (actually redundant, since both ran through before the merge)
+        
+        # We will cater for two types of PDB files
+        # 1: Canonical/MAESTRO-derived PDB files
+        # 2: CHARMM-derived PDB files
+        #
+        # This distinction is made by looking for segids.
+        #
+        # PDB TYPE                  CHAIN IDs       SEGIDs
+        # Canonical/MAESTRO         yes             no (element names)
+        # CHARMM PDB                no              yes
+        # CHARMM PDB ("official")   yes             yes
+        
+        # TREATMENT FOR ALL OBJECTS
+        # Remove lone pairs (if any)
+        self.pm_obj = self._remove_lp()
+
+        # Check if the user has set the protonation states of ionizable residues
+        # using either CHARMM or AMBER residue names (not quite comprehensively defined)
+        # If not, ATTENTION, all occurrences of HIS will be renamed to HSD
+        self.pm_obj = self._check_ionizable()
+
+        # Store the ParmEd object as a dataframe for later use
+        pm_obj_df = self.pm_obj.to_dataframe()
+
+        # THIS MAY BE THE PLACE TO DO BASIC INPUT SANITATION SUCH AS CHECKS FOR:
+        # - doubly capitalized atom names, e.g. CL, NA
+        # - atoms with the same name
+
+        # # Count the segids in the ParmEd object (if any)
+        segids = set(i.residue.segid for i in self.pm_obj)
+
+        # For RNA (some extra treatment is necessary)
+        if self.rna:
+            self.pm_obj = self._add_segids_rna(pm_obj_df)
+            self.pm_obj = self._create_tlc_rna()
+            segids = set(i.residue.segid for i in self.pm_obj)
+            pm_obj_df = self.pm_obj.to_dataframe()
+        
+        # For canonical/MAESTRO-derived PDB files containing chain IDs
+        elif segids == {""}:  # empty set of segids
+            print(f"Processing a ParmEd object without segids (e.g. from a canonical/Maestro based PDB file)")
+            # Add segids to the Parmed object
+            self.pm_obj = self._add_segids(pm_obj_df)
+            # Update the dataframe and segid list
+            pm_obj_df = self.pm_obj.to_dataframe()
+            segids = set(i.residue.segid for i in self.pm_obj)
+            
+            # Check for hydrogens
+            self._check_for_hydrogens()
+            pm_obj_df = self.pm_obj.to_dataframe()
+            
+        # For CHARMM(-GUI)-generated PDB files
         else:
-            self.input_type = "missinghydrogens"
-            print(f"Some residues appear to lack hydrogens: {*h_miss_res,}")
+            print(f"Processing a ParmEd object with segids (e.g. from a CHARMM PDB file)")
+            # Check for hydrogens
+            self._check_for_hydrogens()
+            pm_obj_df = self.pm_obj.to_dataframe()
+            
+        return segids, pm_obj_df
+    
+    def _check_for_hydrogens(self):
+        # Get the segids and dataframe
+        segids = set(i.residue.segid for i in self.pm_obj)
+        pm_obj_df = self.pm_obj.to_dataframe()
+        
+        # Exclude segments that do not need explicit hydrogens (that ICBuild/HBuild can handle)
+        het_segids = [segid for segid in segids if segid[:3] not in ["PRO", "WAT", "ION", "XRD"]]
+        
+        if len(het_segids) == 1:
+            #for segid in het_segids:
+            segid = het_segids[0]
+            struct = self.pm_obj[pm_obj_df.segid == segid]
+            
+            # Make sure there is only one residue in this segid
+            assert len(struct.residues) == 1
+            
+            # Work on the single residue in this segid
+            res = struct.residues[0]
+            
+            # Check for the presence of hydrogens in the structure                 
+            if len([atm for atm in res.atoms if atm.element_name == 'H']) == 0:
+                print(f"No hydrogens found in residue {res.name} from segid {segid}")
+                
+                # Slice a ParmEd object based on the residue (in the segid) 
+                # that does not contain any hydrogens
+                res_obj = self.pm_obj[(pm_obj_df.segid == segid) | (pm_obj_df.resname == res.name)]
+                
+                # Set self.resname
+                self.resname = res.name
+                
+                
+                
+                # Make a folder for the ligand toppar files
+                self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}")
 
+                # Save the object to a PDB file
+                res_obj.save(
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_noH.pdb"
+                    )
+                
+                # Define an OpenBabel object
+                obConversion = openbabel.OBConversion()
+                mol = openbabel.OBMol()
+                                
+                # Read a ligand PDB file to OpenBabel object mol
+                obConversion.ReadFile(
+                        mol,
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_noH.pdb",
+                    )   
+                        
+                # ATTENTION: OpenBabel may or may not get this right
+                # May help if there is trouble:
+                # mol.UnsetFlag(openbabel.OB_PH_CORRECTED_MOL)
+                # mol.SetAutomaticFormalCharge(True)
+                mol.CorrectForPH(self.system_ph)
+                mol.AddHydrogens()
+                
+                # Save the hydrogenated OpenBabel object to a PDB file        
+                obConversion.WriteFile(
+                    mol,
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH.pdb",
+                )
+                
+                # Open a new target file
+                with open(
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_noH.pdb",
+                    "r"
+                ) as ipdb_noh:                         
+                    with open(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH_corr.pdb",
+                        "w"
+                    ) as opdb:
+                        for line in ipdb_noh:
+                            if line.startswith("END"):
+                                pass
+                            else:
+                                opdb.write(line)  
+                                        
+                with open(
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH_corr.pdb",
+                    "a"
+                ) as opdb:       
+                    with open(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH.pdb",
+                        "r"
+                    ) as ipdb_h:
+                        h_num = 1
+                        for line in ipdb_h:
+                            if (((line.startswith("HETATM")) or (line.startswith("ATOM"))) and (line[13:16].strip(" ").startswith("H"))):
+                                line = line.replace("UNL", res.name)
+                                line = line.replace(f" H   {res.name}",f" H{h_num:<3}{res.name}")
+                                line = line.replace(f"{res.name}  ", f"{res.name} {res.chain}")
+                                opdb.write(line)
+                                h_num += 1
+                                
+                        opdb.write(f"END\n")
+      
+
+
+                # Remake the ParmEd object
+                self.pm_obj = pm.load_file(
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH_corr.pdb",
+                    structure=True
+                )
+                
+                # Resave the ParmEd object to view how it was perceived
+                self.pm_obj.save(
+                    f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_withH_pe.pdb"
+                )
+                print(
+                    self.pm_obj[pm_obj_df.segid == f"HETA"].residues[0].name
+                )
+            else:
+                print(f"Hydrogens found in residue {res.name} from segid {segid}")       
+      
+    
+
+
+
+
+    def _add_segids_rna(self, df):
+
+        chids = set(i.residue.chain for i in self.pm_obj)
+        print(f"Found chain IDs: {chids}")
+        for chain in chids:
+            for res in self.pm_obj.view[
+                df.chain == f"{chain}"
+            ].residues:  # produce a select view of this chain's residues using a boolean mask
+                res.segid = f"RNA{chain}"
+
+        return self.pm_obj
+    
     def _create_tlc_rna(self):
 
-        for atom in self.pdb_file.atoms:
+        for atom in self.pm_obj.atoms:
             if atom.residue.name == "G":
                 atom.residue.name = "GUA"
             elif atom.residue.name == "C":
@@ -412,29 +469,24 @@ class Preparation:
             elif atom.residue.name == "I":
                 atom.residue.name = "INO"
 
-        return self.pdb_file
-
-    def _add_segids_rna(self, df):
-
-        chids = set(i.residue.chain for i in self.pdb_file)
-        print(f"Found chain IDs: {chids}")
-        for chain in chids:
-            for res in self.pdb_file.view[
-                df.chain == f"{chain}"
-            ].residues:  # produce a select view of this chain's residues using a boolean mask
-                res.segid = f"RNA{chain}"
-
-        return self.pdb_file
+        return self.pm_obj
 
     def _add_segids(self, df):
         # This function adds segids to the Parmed object from a PDB that does
-        # not contain segids, but only chain ids, ensuring that segids can be
-        # used in making of crd files later.
-        # The function attempts to establish residue names that lie outside the
-        # range of "normal" amino acids names and will give these the name HETx
-        # in which x is the chain ID
+        # not contain segids (only chain ids), ensuring that segids can be
+        # used in making of CRD files later.
+        #
+        # The function evaluates the residue names and gives those that are 
+        # "normal" amino acids the segid PROx, where x is their chain ID.
+        # Waters (HOH) are assigned the segid WAT+chain ID
+        # Residue names in the "HET-exclusion" list below (e.g. common
+        # additives in the crystallization buffer, ions, etc) are given
+        # the segid XRD+chain ID.
+        # Residues that do not correspond to normal amino acid names or
+        # the names given in the exclusion list are given the segid HETx, 
+        # in which x is a letter in ABCDEFGH...
 
-        # TODO This list should be expanded to be comprehensive
+        # TODO This list should be expanded to be comprehensive (look in CHARMM toppar for RESI and PRES)
         aa_res = [
             "ALA",
             "ARG",
@@ -469,22 +521,22 @@ class Preparation:
             "GLUP",
         ]  # we need to find the residue of the ligand which should be the only one being not an aa
 
-        exclude_res = [  # TODO Many more common crystallization additives should be added to this list
+        exclude_res = [# TODO Many more common crystallization additives should be added to this list
             "1PE"
         ]
 
-        # ions_res =[] #TODO A list of ions could be added for their particular handling
+        # ions_res =[] # TODO A list of ions could be added for their particular handling
 
         # Make a list of ABCD... for use as x in HETx
         het_letters = list(string.ascii_uppercase)
 
         # TODO Make this loop handle multiple ligands in one chain
-        chids = set(i.residue.chain for i in self.pdb_file)
+        chids = set(i.residue.chain for i in self.pm_obj)
         # DEBUG
         # print(f"Found chain IDs: {chids}")
         for (
             chain
-        ) in chids:  # rename the chain names (a,b, ...) to segnames (proa,prob,...)
+        ) in chids:
             # DEBUG
             # print(f"Working on chain {chain}.")
 
@@ -492,7 +544,7 @@ class Preparation:
             prev_resnum = -1
 
             # Loop over the residues in the current chain
-            for res in self.pdb_file.view[
+            for res in self.pm_obj.view[
                 df.chain == f"{chain}"
             ].residues:  # produce a select view of this chain's residues using a boolean mask
                 resnum = res.number
@@ -501,66 +553,16 @@ class Preparation:
                 elif res.name == "HOH":
                     res.segid = f"WAT{chain}"
                 elif res.name in exclude_res:
-                    res.segid = f"CRST"
+                    res.segid = f"XRD{chain}"
                 else:
                     if resnum == prev_resnum:
                         pass
                     else:
                         res.segid = f"HET{het_letters.pop(0)}"
-                    # self.resname = i.residue.name
                 prev_resnum = resnum
 
-        return self.pdb_file
-
-    def checkInputType(self):
-
-        # Remove lone pairs (if any)
-        self.pdb_file = self._remove_lp()
-
-        # Check/rename ionizable residues (if the user has not set their protonation states)
-        # ATTENTION: All occurrences of HIS will become HSD
-        self.pdb_file = self._check_ionizable()
-
-        # Store the input PDB as a dataframe for later use
-        df = self.pdb_file.to_dataframe()
-
-        # We will cater for two types of PDB files
-        # 1: Canonical/MAESTRO-derived PDB files
-        # 2: CHARMM-derived PDB files
-        # This distinction is made by looking for segids.
-        # Canonical/MAESTRO-derived PDB files will be void of segids, but will
-        # have chain IDs, while CHARMM PDB files contain the segid column, but
-        # lack chain IDs.
-
-        # # Count the segids in the PDB file (if any)
-        segids = set(i.residue.segid for i in self.pdb_file)
-
-        if self.rna:
-            self.pdb_file = self._add_segids_rna(df)
-            self.pdb_file = self._create_tlc_rna()
-            segids = set(i.residue.segid for i in self.pdb_file)
-            df = self.pdb_file.to_dataframe()
-        # For canonical/MAESTRO-derived PDB files containing chain IDs
-        elif segids == {""}:  # empty set of segids
-            print(f"Processing a canonical/Maestro based pdb file (without segids)")
-            # Check for hydrogens
-            # set self.input_type
-            self._check_for_hydrogens()
-
-            # Add segids to the Parmed object
-            self.pdb_file = self._add_segids(df)
-            # Update the dataframe and segid list
-            df = self.pdb_file.to_dataframe()
-            segids = set(i.residue.segid for i in self.pdb_file)
-        # For CHARMM-GUI generated PDB files
-        else:
-            print(f"Processing a CHARMM PDB file (with segids)")
-            # Check for hydrogens
-            # set self.input_type
-            self._check_for_hydrogens()
-
-        return segids, df
-
+        return self.pm_obj
+    
     def createCRDfiles(self, segids, df):
 
         exclude_segids = [
@@ -580,23 +582,32 @@ class Preparation:
                 used_segids.append(segid)
 
                 # WATERBOX ENVIRONMENT
-                if self.env != "complex":
+                if self.env == "waterbox": #self.env != "complex": # 2023: why not == "waterbox" ?
+                    # For ligands
                     if segid.startswith("HET"):
-
+                        print(
+                            self.pm_obj[df.segid == f"HETA"]
+                        )
                         # Note the residue name for checks
                         self.resname = (
-                            self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                            self.pm_obj[df.segid == f"{segid}"].residues[0].name
                         )
-                        # resname should be a 3 or 4 letters code
-                        # assert len(self.resname) < 5
+                        # resname should be a 3 or 4 letter code
+                        assert len(self.resname) < 5
 
+                        # Make a folder for the ligand files in the waterbox directory
                         self._make_folder(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        # Write the CHARMM CRD file from the ParmEd object
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
+                        
+                        # If the switch is active, copy the original PDB file to the ligand folder
+                        # This seems RISKY, since this PDB file has not been vetted by checkInputType 
+                        # (e.g for hydrogen existence)
                         if self.small_molecule:
                             # We copy the pdf file since there shouldn't be any changes
                             shutil.copy(
@@ -604,13 +615,18 @@ class Preparation:
                                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             )
                         else:
-                            self.pdb_file[df.segid == f"{segid}"].save(
+                            # If the switch is not active, 
+                            # save the CHARMM PDB file of the ligand from the ParmEd object
+ 
+                            self.pm_obj[df.segid == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                                 overwrite=True,
                             )
+                    
+                    # For RNA, a segid-based naming applies (instead of resname-based as above)
                     elif segid.startswith("RNA"):
 
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
@@ -622,40 +638,184 @@ class Preparation:
                         # TODO: Should this check be more generally applied?
                         # Note the residue name for checks
                         self.resname = (
-                            self.pdb_file[df.segid == f"{segid}"].residues[0].name
+                            self.pm_obj[df.segid == f"{segid}"].residues[0].name
                         )
                         # resname should be a 3 or 4 letters code
                         assert len(self.resname) < 5
 
+                        # Make a folder for the ligand in the complex directory
                         self._make_folder(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        
+                        # Save the CHARMM CRD file of the ligand from the ParmEd object
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        
+                        # Save the CHARMM PDB file of the ligand from the ParmEd object
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
 
-                    else:
+                    else: 
+                        # Save the protein, as well as eventual other segids,
+                        # as CHARMM CRD and -PDB files, directly in the complex directory
 
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        self.pdb_file[df.segid == f"{segid}"].save(
+                        self.pm_obj[df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.pdb",
                             overwrite=True,
                         )
                 else:
+                    # Alert if unsupported environments are requested or if input has typos
                     sys.exit(f"Unrecognized environment: {self.env}")
 
         return segids, used_segids
+    
+    def getTopparFromLocalCGenFF(
+        self,
+        cgenff_path=False,
+    ):
+        cgenff_bin = None
+        cgenff_output = None
 
+        # If no particular path is given, check whether CGenFF is available
+        if cgenff_path == False:
+            cgenff_path = shutil.which("cgenff")
+            if cgenff_path == None:
+                print(f"This function requires cgenff.\n"\
+                      f"Please install it in the active environment or point the routine\n"\
+                      f"to the right path using the key cgenff_path='/path/to/cgenff' ."
+                )
+            else:
+                cgenff_bin = cgenff_path
+        else:
+            cgenff_bin = cgenff_path
 
+        # CGenFF exists - start program
+        if cgenff_bin != None:
+            
+            # CGenFF needs a mol2 file as input file
+            self._create_mol2_sdf_file()
+            
+            # If a ligand toppar stream file exists (from a previous rung), 
+            # we will remove it to prevent CGenFF from appending the new topology
+            # and parameters at the end of the old one
+            stream_file = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
+            if os.path.isfile(stream_file):
+                os.remove(stream_file)
+
+            # Run CGenFF
+            ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}"
+
+            cgenff_output = subprocess.run(
+                [cgenff_bin]
+                + [f"{ligand_path}.mol2"]
+                + ["-v"]
+                + ["-f"]
+                + [f"{stream_file}"]
+                + ["-m"]
+                + [f"{ligand_path}.log"],
+                capture_output=True,
+                text=True,
+            )
+
+            # Evaluate the subprocess return code
+            if cgenff_output.returncode == 1:
+                print(f"CGenFF returned an error after being called with:\n"\
+                      f"{' '.join(cgenff_output.args)}\n"\
+                      f"{cgenff_output.stdout}\n"\
+                      f"{cgenff_output.stderr}\n"
+                )
+            else:
+                print(f"CGenFF executed successfully")
+
+            # Modify the resname in the new stream file
+            self._modify_resname_in_stream()
+
+        return cgenff_output
+    
+    def _create_mol2_sdf_file(self):
+
+        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
+        obConversion = openbabel.OBConversion()
+        mol = openbabel.OBMol()
+                
+        # Read a ligand PDB file to OpenBabel object mol
+        
+        # THIS APPEARS TO BE REDUNDANT SINCE small_molecule == True already copies 
+        # the original PDB to the ligand folder
+        
+        # # From the "original" directory
+        # if self.small_molecule:
+        #     obConversion.ReadFile(
+        #         mol,
+        #         f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
+        #     )
+        # # From the "ligandID/environment/residueName" directory, e.g. "cpd10/waterbox/dy6/dy6.pdb"
+        # else:
+        #     obConversion.ReadFile(
+        #         mol,
+        #         f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+        #     )
+        
+        obConversion.ReadFile(
+                mol,
+                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+            )
+        
+        assert (mol.NumResidues()) == 1
+        
+        # Write new files
+        # Convert mol from PDB to MOL2
+        obConversion.SetInAndOutFormats("pdb", "mol2")
+        obConversion.WriteFile(
+            mol,
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.mol2",
+        )
+        
+        # Convert mol from PDB to SDF
+        obConversion.SetInAndOutFormats("pdb", "sdf")
+        obConversion.WriteFile(
+            mol,
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.sdf",
+        )
+        
+    def _modify_resname_in_stream(self):
+
+        # Open the ligand topology and parameter stream file produced by CGenFF
+        stream_in = open(
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",
+            "rt",
+        )
+        # Open a new ligand topology and parameter stream file
+        stream_out = open(
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}_tmp.str",
+            "wt",
+        )
+        
+        # Correct the residue name in the stream file
+        for line in stream_in:
+            if line.startswith("RESI"):
+                stream_out.write(line.replace(line.split()[1], self.resname))
+            else:
+                stream_out.write(line)
+
+        stream_in.close()
+        stream_out.close()
+
+        shutil.copy(stream_out.name, stream_in.name)
+
+    
+###############################################################################
 class CharmmManipulation:
+###############################################################################
     def __init__(
         self,
         parent_dir,
@@ -664,7 +824,7 @@ class CharmmManipulation:
         resname,
         env,
         include_ions=True,
-        ion_name="POT",
+        ion_name="POT", # EXPAND FOR CATION AND ANION?
         ion_conc=0.15,
         default_path="",
     ):
@@ -690,84 +850,16 @@ class CharmmManipulation:
         import macha
 
         return f"{macha.__path__[0]}/data/templates/default/"
-
-    def _appendToppar(self):
-
-        # Add line to CHARMM toppar stream to read ligand parameters
-        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str", "a")
-        file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
-        file.close()
-
-    def _convertCharmmTopparStreamToOpenmm(self, charmmstr_path, openmmstr_path):
-        new_toppar = ""
-        # Read the CHARMM toppar stream from the provided location
-        with open(charmmstr_path, "r") as topparstream:
-            for line in topparstream:
-                if line.startswith("*"):  # DROP: Header
-                    pass
-                elif line.startswith("!"):  # DROP: Comments
-                    pass
-                elif line.strip(" ") == "\n":  # DROP: Empty lines
-                    pass
-                elif line.startswith("read"):  # DROP: Legacy read statements
-                    pass
-                else:
-                    strpath = line.split(" ")[-1]
-                    new_toppar += f"./{strpath}"
-                    # Split on whitespace and take the last item in the
-                    # resulting list of words (the path to each stream file,
-                    # including the newline characters.
-
-        # Write the new OpenMM toppar stream to the requested location
-        with open(openmmstr_path, "w") as topparstream:
-            topparstream.write(new_toppar)
-
-    def _getExternalTopparFromTopparStream(self, topparstream):
-        external_toppars = []
-        with open(topparstream, "r") as tp_str:
-            for line in tp_str:
-                if "toppar" in line:
-                    pass
-                else:
-                    external_toppars.append(line.split("/")[1])
-
-        return external_toppars
-
-    def _modifyIonsCountFile(self):
-
-        fout = open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count_tmp.str",
-            "wt",
-        )
-        with open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str",
-            "r+",
-        ) as f:
-            for line in f:
-                if "set pos" in line:
-                    new_line = line.replace("POT", str(self.ion_name))
-                    fout.write(new_line)
-                elif "set conc" in line:
-                    new_line = line.replace("0.15", str(self.ion_conc))
-                    fout.write(new_line)
-                else:
-                    fout.write(line)
-        fout.close()
-
-        shutil.copy(
-            fout.name,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str",
-        )
-        os.remove(fout.name)
-
-        pass
-
+    
     def copyFiles(self):
         # Copy files from template path
         # CHARMM related files
         for file in glob.glob(f"{self.default_path}/*[!omm_*][!toppar][!__pycache__]*"):
             shutil.copy(file, f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
 
+        # CHECK FOR USER INPUT ON ION TYPE AND ION STRENGTH
+        # If someething other than the default is requested, edit the step2.2 ions 
+        # stream file on the fly.
         if self.ion_name != "POT" or self.ion_conc != 0.15:
             self._modifyIonsCountFile()
 
@@ -790,65 +882,106 @@ class CharmmManipulation:
             )
         except:
             print(f"Toppar directory is already available")
+    
+    def _modifyIonsCountFile(self):
 
-    def modifyStep1(self, segids):
-
-        # Append the ligand toppar to the CHARMM toppar stream
-        try:
-            self._appendToppar()
-        except TypeError:
-            print("Won't add a ligand stream file, assuming it's a RNA strand")
-
-        correction_on = False
-
+        # Create a target for a new step2.2 ions stream file
         fout = open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader_tmp.inp",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count_tmp.str",
             "wt",
         )
+        
+        # Read the existing template step2.2 ions stream file and replace the occurrences
+        # of "POT" and "0.15", with the cation type and concentration requested by the user
         with open(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp", "r+"
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str",
+            "r+",
         ) as f:
             for line in f:
-                if line.startswith("! Read PROA"):
-                    correction_on = True
-                    f.readline()
-                    string = CharmmFactory.createHeader(segids, self.env)
-                    fout.write(f"{string} \n")
-                if line.startswith("!Print heavy atoms with "):
-                    correction_on = False
-
-                if correction_on == True:
-                    pass
+                if "set pos" in line:
+                    new_line = line.replace("POT", str(self.ion_name))
+                    fout.write(new_line)
+                elif "set conc" in line:
+                    new_line = line.replace("0.15", str(self.ion_conc))
+                    fout.write(new_line)
                 else:
                     fout.write(line)
         fout.close()
 
         shutil.copy(
             fout.name,
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp",
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2.2_ions_count.str",
         )
         os.remove(fout.name)
 
-    def _runCHARMM(self, step, charmm_exe):
-        # We need to go to the specific directory to run CHARMM
-        main_dir = os.getcwd()
-        os.chdir(f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
-        output = subprocess.run(
-            [f"{charmm_exe}"] + ["-i"] + [f"{step}.inp"] + ["-o"] + [f"{step}.out"],
-            text=True,
-            capture_output=True,
+        pass
+    
+    def modifyStep1(self, segids):
+
+        # NOTE The function _appendLigandTopparToTopparStream (3 lines) is only used here
+        # Perhaps it is better to include it directly?
+        # Also, it is unclear what throws the TypeError exception below
+        # - this should be commented on to explain the integration of the
+        # RNA "layer"
+        
+        # Append the ligand toppar to the CHARMM toppar stream
+        try:
+            self._appendLigandTopparToTopparStream()
+        except TypeError:
+            print("Won't add a ligand stream file - assuming that the ligand is an RNA strand")
+
+
+        # Open a a target for the new input file
+        fout = open(
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader_tmp.inp",
+            "wt",
         )
-        os.chdir(main_dir)
-        if output.returncode:
-            print(
-                f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
-            )
-            sys.exit("Processing terminated")
-        else:
-            print(f"CHARMM process finished for {step}")
+        # Read the template input file and 
 
+        header_section_active = False # A switch to mark whether we are in the header 
+                                      # section of step1_pdbreader as we read the file
+                                      # and replace/copy its lines
+        with open(
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp", "r+"
+        ) as f:
+            for line in f:
+                if line.startswith("! Read PROA"): # Marks the start of the header section
+                                                   # with the read/generate statements
+                    header_section_active = True
+                    f.readline() # What does this do?
+                    
+                    # Create read/generate statements from segids
+                    # NOTE WHY IS THIS NOT A FUNCTION IN THE CHARMMMANIPULATION CLASS, 
+                    # BUT RATHER IN ITS OWN CLASS (CHARMMFACTORY)?
+                    header_block = CharmmFactory.createHeader(segids, self.env)
+                    fout.write(f"{header_block}\n")                    
+                    
+                if line.startswith("!Print heavy atoms with "): # Marks the end of the header section
+                    header_section_active = False
+
+                # If we are in the header section, we should not record the lines in the
+                # template file since these have been replaced by new ones
+                if header_section_active == True:
+                    pass
+                else: # The rest of the step1_pdbreader.inp however, we copy verbatim
+                    fout.write(line)
+                    
+        fout.close()
+        
+        # Copy the finished modified file to the environment system directory
+        shutil.copy(
+            fout.name,
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/step1_pdbreader.inp",
+        )
+        os.remove(fout.name)
+        
+    def _appendLigandTopparToTopparStream(self):
+        # Add line to CHARMM toppar stream to read ligand parameters
+        file = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar.str", "a")
+        file.write(f"stream {self.resname.lower()}/{self.resname.lower()}.str")
+        file.close()
+        
     def executeCHARMM(self, charmm_exe):
-
         steps = [
             "step1_pdbreader",
             "step2.1_waterbox",
@@ -863,30 +996,63 @@ class CharmmManipulation:
             # next CHARMM input file (step2_solvator)
             steps.remove("step2.2_ions")
 
-            dir = f"{self.parent_dir}/{self.ligand_id}/{self.env}"
-            correction_on = False
-            fout = open(f"{dir}/step2_solvator.inp", "wt")
+            # Open a target for the modified step2_solvator input file
+            fout = open(f"{self.parent_dir}/{self.ligand_id}/{self.env}/step2_solvator.inp", "wt")
+            
+            read_ions_section_active = False
+
             with open(f"{self.default_path}/step2_solvator.inp", "r+") as f:
                 for line in f:
-                    if line.startswith("! Add ions?"):
-                        correction_on = True
+                    if line.startswith("! Add ions?"):              # Marks the start of the 
+                        read_ions_section_active = True             # read ions section
 
-                    if line.startswith("! Remove water molecules"):
-                        correction_on = False
+                    if line.startswith("! Remove water molecules"): # Marks the end of the
+                        read_ions_section_active = False            # read ions section
 
-                    if correction_on == True:
+                    # If we are in the read ions section, we should not record these lines
+                    # in the new file
+                    if read_ions_section_active == True:
                         pass
-                    elif line.startswith("* set"):
+                    elif line.startswith("* set"):                     # Also exclude
                         pass
-                    elif line.startswith("* stream step2.2_ions.str"):
+                    elif line.startswith("* stream step2.2_ions.str"): # Also exclude
                         pass
-                    else:
+                    else: # The rest of the step2_solvator.inp however, we copy verbatim
                         fout.write(line)
             fout.close()
-
+            
+            
+        # Now, run CHARMM-GUI input scripts
         for step in steps:
             returncode = self._runCHARMM(step, charmm_exe)
 
+    def _runCHARMM(self, step, charmm_exe):
+        # Record the directory where we start
+        main_dir = os.getcwd()
+        
+        # We need to go to the specific directory to run CHARMM
+        os.chdir(f"{self.parent_dir}/{self.ligand_id}/{self.env}/")
+        
+        # Start a subprocess
+        output = subprocess.run(
+            [f"{charmm_exe}"] + ["-i"] + [f"{step}.inp"] + ["-o"] + [f"{step}.out"],
+            text=True,
+            capture_output=True,
+        )
+        
+        # Return to the main directory
+        os.chdir(main_dir)
+        
+        # A basic evaluation of the subprocess output codes
+        if output.returncode:
+            print(
+                f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
+            )
+            sys.exit("Processing terminated")
+        else:
+            print(f"CHARMM process finished for {step}")
+            
+            
     def createOpenMMSystem(self):
         print("Creating a stand-alone OpenMM system")
 
@@ -939,6 +1105,10 @@ class CharmmManipulation:
                     print(
                         f"ERROR: External topology/parameter folder {ext_top} not found!"
                     )
+                    
+                # NOTE Here we are not allowing the overwriting of the ligand toppar folder
+                # though that could be a useful behaviour. Consider adding
+                # shutil.copytree(from, to, dirs_exist_ok=True) which works since Python 3.8
                 except FileExistsError:
                     print(
                         f"The topology/parameters folder {ext_top} is already present."
@@ -966,21 +1136,50 @@ class CharmmManipulation:
             f.write(
                 '{"dimensions":[' + f"{a}, {b}, {c}, {alpha}, {beta}, {gamma}" + "]}"
             )
+        
+    def _convertCharmmTopparStreamToOpenmm(self, charmmstr_path, openmmstr_path):
+        new_toppar = ""
+        # Read the CHARMM toppar stream from the provided location
+        with open(charmmstr_path, "r") as topparstream:
+            for line in topparstream:
+                if line.startswith("*"):       # DROP: Header
+                    pass
+                elif line.startswith("!"):     # DROP: Comments
+                    pass
+                elif line.strip(" ") == "\n":  # DROP: Empty lines
+                    pass
+                elif line.startswith("read"):  # DROP: Legacy read statements
+                    pass
+                else:
+                    strpath = line.split(" ")[-1]
+                    new_toppar += f"./{strpath}"
+                    # Split on whitespace and take the last item in the
+                    # resulting list of words (the path to each stream file,
+                    # including the newline characters.
+
+        # Write the new OpenMM toppar stream to the requested location
+        with open(openmmstr_path, "w") as topparstream:
+            topparstream.write(new_toppar)
+
+    def _getExternalTopparFromTopparStream(self, topparstream):
+        external_toppars = []
+        with open(topparstream, "r") as tp_str:
+            for line in tp_str:
+                if "toppar" in line:
+                    pass
+                else:
+                    external_toppars.append(line.split("/")[1])
+
+        return external_toppars
+
 
     def applyHMR(self):
 
-        # try:
-        # If input_orig does not exist (the system has not been updated/overwritten)
+        # If input_orig does not exist, the system has not been updated/overwritten yet, and
+        # this is likely the first pass. Thus, we should make a backup.
         if not os.path.isfile(
             f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf"
         ):
-
-            # Load parameters
-            # parms = ()
-            # for file in glob.glob(f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar/*[!tip216.crd]*"):
-            #     parms += ( file, )
-
-            # parms += (f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str",)
 
             # Copy the original PSF to a backup (input_orig)
             shutil.copy(
@@ -1025,7 +1224,7 @@ class CharmmManipulation:
         )
 
         # *Since ParmEd forgot about the masses when loading the PSF above,
-        # we need to load the parameters to update the masses in the CharmmPsfFile class.
+        # we need to load the parameters now to update the masses in the CharmmPsfFile class.
         psf.load_parameters(params)
 
         # Apply HMR and save PSF
@@ -1035,22 +1234,13 @@ class CharmmManipulation:
             overwrite=True,
         )
 
-        # Assure that mass is greater than one
+        # Assure that hydrogen mass in a TIP3P water is greater than one
         for atom in psf:
             if atom.name.startswith("H") and atom.residue.name != "TIP3":
                 assert atom.mass > 1.5
         print("Successfully applied HMR.")
 
-        # except:
-        #    print("Masses were left unchanged! HMR not possible, check your output! ")
 
-    def _apply_constraints(self, fout):
-
-        with open(fout, "r") as file:
-            filedata = file.read()
-        filedata = filedata.replace("cons: None", "cons: HBonds")
-        with open(fout, "w") as file:
-            file.write(filedata)
 
     def createTFYamlFile(self, dt=0.001, nstep=2500000):
 
@@ -1086,3 +1276,11 @@ class CharmmManipulation:
 
             if dt != 0.001:
                 self._apply_constraints(fout.name)
+                
+    def _apply_constraints(self, fout):
+
+        with open(fout, "r") as file:
+            filedata = file.read()
+        filedata = filedata.replace("cons: None", "cons: HBonds")
+        with open(fout, "w") as file:
+            file.write(filedata)
