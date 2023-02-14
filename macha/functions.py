@@ -464,7 +464,7 @@ class Preparation:
         else:
             print(
                 f"Skip checking whether hydrogens are defined in a protein-ligand complex,\n"\
-                f"since the apo protein will be excised from the complex in the next step"
+                f"since the apo protein will be produced in the next step (and all other segids are discarded)."
             )    
       
     
