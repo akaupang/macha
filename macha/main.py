@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created in February 2023
+Updated in February 2023
 
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
@@ -14,7 +14,7 @@ from functions import checkInput, Preparation, CharmmManipulation
 
 parent_dir = "data"
 original_dir = "original"
-input_ext = "pdb"         # exclusive support for PDB
+input_ext = "pdb"         # exclusive support for PDB files for now
 protein_name = "protein"  # -> protein.pdb
 cgenff_path = ""          # MUST BE SET BY USER
 
@@ -50,7 +50,7 @@ else:
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
 
-    print("\n")
+    print(f"---------------------------------------------------------------\n")
     print(f"Processing ligand {ligand_id}")
 
     for env in envs:
@@ -65,19 +65,17 @@ for ligand_id in ligand_ids:
             small_molecule=False,
             rna=False,
         )
-
+        
+        # Make a Transformato style folder structure
+        preparation.makeTFFolderStructure()
+        
         # Check input types
         segids, pm_obj_df = preparation.checkInputType()
 
-        # Make a Transformato style folder structure
-        preparation.makeTFFolderStructure()
-
         # Create CHARMM Coordinate files
         segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
-        print("The following segment IDs were found/assigned:")
-        print(*segids)
-        print("The following segment IDs were used/not excluded:")
-        print(*used_segids)
+        print(f"The following segment IDs were found/assigned:    " + " ,".join(segids)) 
+        print(f"The following segment IDs were used/not excluded: " + " ,".join(used_segids))
 
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
