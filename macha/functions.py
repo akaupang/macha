@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore", module="parmed")
 
 
 def checkInput(
-    parent_dir=".", original_dir="original", protein_name=None, input_ext="pdb"
+    parent_dir="data", original_dir="original", protein_name=None, input_ext="pdb"
 ):
 
     # Make sure the input directory exists

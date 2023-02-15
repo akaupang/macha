@@ -4,9 +4,9 @@ from macha.functions import Preparation, checkInput, CharmmManipulation
 import os
 import parmed as pm
 
-ligand_id = "../data/original/cdk2_32.pdb"
-parent_dir = "."
-original_dir = "macha/data/original"
+ligand_id = "cdk2_32"
+parent_dir = "macha/data"
+original_dir = "original"
 
 def test_import():
     import parmed as pm
@@ -14,16 +14,22 @@ def test_import():
 
 def test_checkInput():
 
-    proteinID,ligandID = checkInput(parent_dir=parent_dir, original_dir=original_dir, protein_name=None, input_ext="pdb")
+    protein_id,ligand_ids = checkInput(parent_dir=parent_dir, original_dir=original_dir, protein_name=None, input_ext="pdb")
 
-    # assure that all ligands are found by the function
-    if not proteinID:
-        assert len(os.listdir(original_dir)) == len(ligandID)
+    # Assure that all ligands are found by the function
+    if not protein_id:
+        assert len(os.listdir(original_dir)) == len(ligand_ids)
 
 def test_createFolders():
 
-    preparation = Preparation(parent_dir=parent_dir, ligand_id="cdk2_l32",original_dir=original_dir,env="waterbox")
-    pdb_macha = preparation.pdb_file
+    preparation = Preparation(
+        parent_dir=parent_dir,
+        ligand_id=ligand_id,
+        original_dir=original_dir,
+        env="waterbox"
+    )
+    
+    pdb_macha = preparation.pm_obj
     pdb_orig = pm.load_file("macha/data/original/cdk2_l32.pdb")
    
     # check if pdb file is read in correctly by parmed and compare a random atom to the original file
@@ -38,7 +44,6 @@ def test_createFolders():
     reason="Skipping tests that cannot pass in github actions",
 )
 def test_run_macha_for_rna():
-
 
     ligand_id = "ino5"
     parent_dir = "macha/data"
