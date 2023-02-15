@@ -152,6 +152,7 @@ class Preparation:
                 sys.exit(f"Unrecognized environment: {self.env}")
     
     def makeTFFolderStructure(self):
+        self._make_folder(f"{self.parent_dir}/config/")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
