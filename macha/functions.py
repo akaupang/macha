@@ -152,18 +152,18 @@ class Preparation:
                 sys.exit(f"Unrecognized environment: {self.env}")
     
     def makeTFFolderStructure(self):
-        self._make_folder(f"{self.parent_dir}/config/")
+        self._make_folder(f"{self.parent_dir}/config")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
-        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/")
+        self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm")
         self._make_folder(
-            f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints/"
+            f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/restraints"
         )
         
     def _make_folder(self, path):
         try:
             os.makedirs(path)
-            print(f"Creating folder in {path} for the {self.env}")
+            print(f"Creating folder {path} for the {self.env}")
         except OSError:
             print(f"The folder {path} for the {self.env} exists - we will use it")
             if not os.path.isdir(path):
