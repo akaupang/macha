@@ -584,14 +584,9 @@ class Preparation:
         # Or skip checks, in case of protein from complex
         else:
             print(
-                f"Skip checking whether hydrogens are defined in a protein-ligand complex,\n"\
-                f"since the apo protein will be produced in the next step (and all other segids are discarded)."
+                f"Skip check for hydrogens in protein-ligand complex - the apo protein\n"\
+                f"will be produced in the next step, discarding all other segids"
             )    
-      
-    
-
-
-
 
     def _add_segids_rna(self, pm_obj_df):
 
@@ -1407,7 +1402,7 @@ class CharmmManipulation:
         for atom in psf:
             if atom.name.startswith("H") and atom.residue.name != "TIP3":
                 assert atom.mass > 1.5
-        print("Successfully applied HMR.")
+        print("Successfully applied HMR")
 
 
 
