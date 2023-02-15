@@ -252,7 +252,7 @@ class Preparation:
                             atom_names.append(new_aname + new_anumber)
                             
                             # Let the user know that this replacement happened
-                            print(f"Atom name: {exist_an} exists. Replaced with {new_aname + new_anumber}")
+                            print(f"Atom name {exist_an} exists. Replaced with {new_aname + new_anumber}")
 
                         else:
                             # Add unique atomname to a list for comparison
