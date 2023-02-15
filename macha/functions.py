@@ -228,7 +228,7 @@ class Preparation:
                             elementname = re.sub(UU_Case, _convert_double_uppercase_to_upperlower, elementname)
                             Uu_en = elementname.replace(' ','').strip('\n')
                             print(
-                                f"Double uppercase atom name {UU_en} "\
+                                f"Double uppercase element name {UU_en} "\
                                 f"replaced with {Uu_en}"
                             )
                             
@@ -274,7 +274,7 @@ class Preparation:
 
 
     def mergeToComplex(self):
-        print("* * * Begin merge to complex * * *")
+        print("* * * Merge to complex * * *")
         # Here, it is practical to borrow the "self.pm_obj" temporarily
         # for both the input protein and later for the ligand. This solution
         # benefits from the fact that most of the internal functions in this
@@ -316,7 +316,7 @@ class Preparation:
         # is performed
         self.pm_obj = apo_protein_pm_obj + ligand_pm_obj
 
-        print("* * * End merge * * *")
+        print("* * *    End merge     * * *")
 
     def checkInputType(self, is_complex=False):
         # Since this function runs right after the __init__ function,
