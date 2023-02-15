@@ -78,7 +78,8 @@ class Preparation:
         protein_id=None,
         small_molecule=False,
         rna=False,
-        system_ph=7.4
+        system_ph=7.4,
+        input_sanitation=True,
     ):
 
         """
@@ -96,44 +97,60 @@ class Preparation:
         self.rna: bool = rna
         self.input_type = None
         self.system_ph = system_ph
-
+        
         # Distinguished treatment if the current ligand is to be merged with a protein
         if self.protein_id == None:
-            # For complexes->waterbox+complex or single ligands->waterbox
-            # Load the PDB file into ParmEd
-            self.pm_obj_orig = (
+            # Original input file
+            self.orig_ligand_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             )
-            self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
+            
+            # Optionally disabled input sanitation
+            if input_sanitation == True:
+                self.sanitizeInput(self.orig_ligand_input)
+            
+            # ENVIRONMENTS
+            # For single ligands -> waterbox
+            # Perhaps also useful for:
+            # complex.pdb -> complex + ligand (from complex) in waterbox
+            # Load the PDB file into ParmEd
+            self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
+            
             if self.env == "single_strand":
-                self.pm_obj_orig = (
-                    f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
-                )
-                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
-                self.pm_obj = self.pm_obj["A", :, :]  # select only CHAIN A 
-                                                          # TODO: MAKE THIS MORE ROBUST
+                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
+                self.pm_obj = self.pm_obj["A", :, :]    # select only CHAIN A 
+                
         else:
+            # Original input file
+            self.orig_ligand_input = (
+                f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+            )
+            
+            # Optionally disabled input sanitation
+            if input_sanitation == True:
+                self.sanitizeInput(self.orig_ligand_input)
+
+            self.orig_protein_input = (
+                f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb"
+            )
+            # Input proteins are not sanitized!
+                        
+            # ENVIRONMENTS            
             if self.env == "waterbox" or self.env == "double_strand":
                 # Run like normal single ligand
-                self.pm_obj_orig = (
-                    f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
-                )
-                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
+                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
                 
             elif self.env == "single_strand":
-                self.pm_obj_orig = (
-                    f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
-                )
-                self.pm_obj = pm.load_file(self.pm_obj_orig, structure=True)
-                self.pm_obj = self.pm_obj["A", :, :]  # select only CHAIN A
+                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
+                self.pm_obj = self.pm_obj["A", :, :]    # select only CHAIN A
 
             elif self.env == "complex":
                 # Start the merger function
-                self.mergeToComplex()
+                self.mergeToComplex() 
 
             else:
                 sys.exit(f"Unrecognized environment: {self.env}")
-                
+    
     def makeTFFolderStructure(self):
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}")
         self._make_folder(f"{self.parent_dir}/{self.ligand_id}/{self.env}")
@@ -151,6 +168,110 @@ class Preparation:
             print(f"There exists a folder in {path} for {self.env} - we will use it")
             if not os.path.isdir(path):
                 raise
+            
+    def sanitizeInput(self, structure_file_path):
+        import re
+        
+        # This only works for PDBs
+        assert structure_file_path.endswith(".pdb")
+        
+        # Backup original file if a backup does not exist
+        if os.path.isfile(f"{structure_file_path}.bck"):
+            shutil.copy(
+                f"{structure_file_path}.bck",
+                structure_file_path,
+            )
+        else:
+            shutil.copy(
+                structure_file_path,
+                f"{structure_file_path}.bck",
+            )
+        
+        # Compile regular expressions
+        UU_Case = re.compile('([A-Z][A-Z])')
+                       
+        # Define private functions
+        def _convert_double_uppercase_to_upperlower(match_obj):
+            if match_obj.group(1) is not None:
+                return match_obj.group(1)[0].upper() + match_obj.group(1)[1].lower()
+        
+        
+        # Open input and output, and write eventual changes
+        # This checks and fixes:
+        # - double uppercase atom names
+        # - instances of duplicate atom name+number
+        #
+        with open(f"{structure_file_path}.bck", "r") as isf:
+            with open(structure_file_path, "w") as osf:
+                atom_names = []
+                for line in isf:
+                    if ((line.startswith("HETATM")) or (line.startswith("ATOM"))):
+                        
+                        # Gather portions of the PDB file
+                        linestart=line[0:12]
+                        atomname=line[12:16]
+                        linemiddle=line[16:76]
+                        elementname=line[76:]
+                             
+                        # Check and fix double uppercase
+                        if re.match(UU_Case, atomname):
+                            UU_an = atomname.replace(' ','')
+                            atomname = re.sub(UU_Case, _convert_double_uppercase_to_upperlower, atomname)
+                            Uu_an = atomname.replace(' ','')
+                            print(
+                                f"Double uppercase atom name {UU_an} "\
+                                f"replaced with {Uu_an}"
+                            )
+                        
+                        if re.match(UU_Case, elementname):
+                            UU_en = elementname.replace(' ','').strip('\n')
+                            elementname = re.sub(UU_Case, _convert_double_uppercase_to_upperlower, elementname)
+                            Uu_en = elementname.replace(' ','').strip('\n')
+                            print(
+                                f"Double uppercase atom name {UU_en} "\
+                                f"replaced with {Uu_en}"
+                            )
+                            
+                        # Check if atomname has been seen before
+                        this_an = atomname.replace(' ','')
+                        if this_an in atom_names:
+                            # Get the existing atom name - there should be only one
+                            exist_an = [name for name in atom_names if name == this_an][0]
+                            
+                            # Split the atom name and the atom number
+                            nn_lst = re.split('(\d+)', exist_an)
+                            
+                            # Add 1 to the atom number and recompile atom name/number
+                            new_aname = f"{nn_lst[0]}"
+                            new_anumber = f"{int(nn_lst[1])+1}"
+                            
+                            # Format the new atomname portion for the line
+                            atomname = f"{new_aname:>2}{new_anumber:<2}" # 12:16 = 4 characters
+                                                        
+                            # Add modified atomname to the list, in case duplication propagates
+                            atom_names.append(new_aname + new_anumber)
+                            
+                            # Let the user know that this replacement happened
+                            print(f"Atom name: {exist_an} exists. Replaced with {new_aname + new_anumber}")
+
+                        else:
+                            # Add unique atomname to a list for comparison
+                            atom_names.append(this_an)
+
+                        # Write the finished line
+                        osf.write(linestart + atomname + linemiddle + elementname)
+                                                    
+                    else:
+                        osf.write(line)
+
+        
+
+
+
+
+        
+        
+
 
     def mergeToComplex(self):
         print("* * * Begin merge to complex * * *")
@@ -163,7 +284,7 @@ class Preparation:
         # Load the protein
         print(f"Processing protein (input typing, segid addition, HETx removal)")
         self.pm_obj = pm.load_file(
-            f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb", structure=True
+            self.orig_protein_input, structure=True
         )
 
         # What kind of protein PDB file has been provided?
@@ -180,9 +301,9 @@ class Preparation:
         # HERE THE LIGAND WITH HYDROGENS FROM OPENBABEL MUST BE LOADED
         print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
         self.pm_obj = pm.load_file(
-            f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb", structure=True
+            self.orig_ligand_input, structure=True
         )
-
+        
         # Add segids to ligand ParmEd object if there are none
         segids, pm_obj_df = self.checkInputType(is_complex=False)
 
@@ -472,13 +593,13 @@ class Preparation:
 
 
 
-    def _add_segids_rna(self, df):
+    def _add_segids_rna(self, pm_obj_df):
 
         chids = set(i.residue.chain for i in self.pm_obj)
-        print(f"Found chain IDs: " + " ,".join(chids))
+        print(f"Found chain IDs: " + ", ".join(chids))
         for chain in chids:
             for res in self.pm_obj.view[
-                df.chain == f"{chain}"
+                pm_obj_df.chain == f"{chain}"
             ].residues:  # produce a select view of this chain's residues using a boolean mask
                 res.segid = f"RNA{chain}"
 
@@ -502,7 +623,7 @@ class Preparation:
 
         return self.pm_obj
 
-    def _add_segids(self, df):
+    def _add_segids(self, pm_obj_df):
         # This function adds segids to the Parmed object from a PDB that does
         # not contain segids (only chain ids), ensuring that segids can be
         # used in making of CRD files later.
@@ -560,14 +681,14 @@ class Preparation:
 
         # RUDIMENTARY TEST FOR EXISTING SEGIDS (NEGATIVE)
         # TRUE IF NOT ALL ENTRIES HAVE A SEGID
-        if len(df) != len([line for line in df.segid if line != ""]):
+        if len(pm_obj_df) != len([line for line in pm_obj_df.segid if line != ""]):
             # Make a list of ABCD... for use as x in HETx
             het_letters = list(string.ascii_uppercase)
 
             # TODO Make this loop handle multiple ligands in one chain
             chids = set(i.residue.chain for i in self.pm_obj)
             # DEBUG
-            print(f"Found chain IDs: " + " ,".join(chids))
+            print(f"Found chain IDs: " + ", ".join(chids))
             
             for (
                 chain
@@ -580,7 +701,7 @@ class Preparation:
 
                 # Loop over the residues in the current chain
                 for res in self.pm_obj.view[
-                    df.chain == f"{chain}"
+                    pm_obj_df.chain == f"{chain}"
                 ].residues:  # produce a select view of this chain's residues using a boolean mask
                     # DEBUG
                     #print(f"Working on residue {res.name}")
@@ -602,7 +723,7 @@ class Preparation:
 
         return self.pm_obj
     
-    def createCRDfiles(self, segids, df):
+    def createCRDfiles(self, segids, pm_obj_df):
 
         exclude_segids = [
             "HETB",
@@ -632,7 +753,7 @@ class Preparation:
                         
                         # Note the residue name for checks
                         self.resname = (
-                            self.pm_obj[df.segid == f"{segid}"].residues[0].name
+                            self.pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
                         )
                         # resname should be a 3 or 4 letter code
                         assert len(self.resname) < 5
@@ -642,7 +763,7 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
                         # Write the CHARMM CRD file from the ParmEd object
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
@@ -660,7 +781,7 @@ class Preparation:
                             # If the switch is not active, 
                             # save the CHARMM PDB file of the ligand from the ParmEd object
  
-                            self.pm_obj[df.segid == f"{segid}"].save(
+                            self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                                 overwrite=True,
                             )
@@ -670,7 +791,7 @@ class Preparation:
                         # DEBUG
                         #print(f"env: {self.env}, segid: {segid}")
     
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
@@ -684,7 +805,7 @@ class Preparation:
                         # TODO: Should this check be more generally applied?
                         # Note the residue name for checks
                         self.resname = (
-                            self.pm_obj[df.segid == f"{segid}"].residues[0].name
+                            self.pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
                         )
                         # resname should be a 3 or 4 letters code
                         assert len(self.resname) < 5
@@ -695,13 +816,13 @@ class Preparation:
                         )
                         
                         # Save the CHARMM CRD file of the ligand from the ParmEd object
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         
                         # Save the CHARMM PDB file of the ligand from the ParmEd object
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
                         )
@@ -712,11 +833,11 @@ class Preparation:
 
                         # Save the protein, as well as eventual other segids,
                         # as CHARMM CRD and -PDB files, directly in the complex directory
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
-                        self.pm_obj[df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.pdb",
                             overwrite=True,
                         )

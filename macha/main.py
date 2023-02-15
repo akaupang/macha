@@ -21,6 +21,8 @@ cgenff_path = ""          # MUST BE SET BY USER
 ################################################################################
 # MAIN (WORK)
 ################################################################################
+print(f"{str(' '):>90}")
+print(f"------------------------------------------------------------------------------{str('MACHA 2023'):>11}")
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
 # If protein.pdb is found, assume ligands alone.
@@ -49,11 +51,14 @@ else:
 
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
-
-    print(f"---------------------------------------------------------------\n")
+    
+    print(f"------------------------------------------------------------------------------------------")
     print(f"Processing ligand {ligand_id}")
 
     for env in envs:
+        # Announce the current environment
+        print(f"-------------------------------------------------------------------------------- {env.upper():>8}")
+        
         # Preparation of ligands
         # Instantiate class
         preparation = Preparation(
@@ -64,6 +69,9 @@ for ligand_id in ligand_ids:
             protein_id=protein_id,
             small_molecule=False,
             rna=False,
+            system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
+                            # be protonated by OpenBabel according to this pH
+            input_sanitation=True,
         )
         
         # Make a Transformato style folder structure
@@ -74,8 +82,8 @@ for ligand_id in ligand_ids:
 
         # Create CHARMM Coordinate files
         segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
-        print(f"The following segment IDs were found/assigned:    " + " ,".join(segids)) 
-        print(f"The following segment IDs were used/not excluded: " + " ,".join(used_segids))
+        print(f"The following segment IDs were found/assigned:    " + ", ".join(segids)) 
+        print(f"The following segment IDs were used/not excluded: " + ", ".join(used_segids))
 
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
@@ -107,3 +115,4 @@ for ligand_id in ligand_ids:
         
         # Create YAML file for ASFE simulations using TF (requires ./parent/config directory)
         charmmManipulation.createTFYamlFile(dt=0.002, nstep=2500000)
+        
