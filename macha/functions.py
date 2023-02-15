@@ -96,7 +96,7 @@ class Preparation:
         self.small_molecule: bool = small_molecule
         self.rna: bool = rna
         self.input_type = None
-        self.system_ph = system_ph
+        self.system_ph = system_ph        
         
         # Distinguished treatment if the current ligand is to be merged with a protein
         if self.protein_id == None:

@@ -21,8 +21,10 @@ cgenff_path = ""          # MUST BE SET BY USER
 ################################################################################
 # MAIN (WORK)
 ################################################################################
+# Introductions are in order
 print(f"{str(' '):>90}")
-print(f"------------------------------------------------------------------------------{str('MACHA 2023'):>11}")
+print(f"======================================================================== m   a   c   h   a")
+print(f"{str(' '):>90}")
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
 # If protein.pdb is found, assume ligands alone.
@@ -51,14 +53,16 @@ else:
 
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
-    
-    print(f"------------------------------------------------------------------------------------------")
+    # Pretty printing
+    print(f"__________________________________________________________________________________________")
+    print(f"{str(' '):>90}")
     print(f"Processing ligand {ligand_id}")
 
     for env in envs:
         # Announce the current environment
-        print(f"-------------------------------------------------------------------------------- {env.upper():>8}")
-        
+        print(f"_________________________________________________________________________________ {env.upper():>8}")
+        print(f"{str(' '):>90}")
+
         # Preparation of ligands
         # Instantiate class
         preparation = Preparation(
@@ -115,4 +119,7 @@ for ligand_id in ligand_ids:
         
         # Create YAML file for ASFE simulations using TF (requires ./parent/config directory)
         charmmManipulation.createTFYamlFile(dt=0.002, nstep=2500000)
+        
+        # Space to pause and consider
+        print(f"{str(' '):>90}")
         
