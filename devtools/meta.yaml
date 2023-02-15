@@ -21,4 +21,5 @@ requirements:
     - pip
     - parmed
     - openbabel
-
+    - natsort
+    - re
