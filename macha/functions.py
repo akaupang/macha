@@ -161,12 +161,11 @@ class Preparation:
         )
         
     def _make_folder(self, path):
-
         try:
             os.makedirs(path)
             print(f"Creating folder in {path} for the {self.env}")
         except OSError:
-            print(f"There exists a folder in {path} for {self.env} - we will use it")
+            print(f"The folder {path} for the {self.env} exists - we will use it")
             if not os.path.isdir(path):
                 raise
             
