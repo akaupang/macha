@@ -59,8 +59,9 @@ cgenff_exec () {
 # Transformato submenu
 run_t_submenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Transformato Options"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " 1 : Run Transformato system creation (Python 3.9)"
   echo " 2 : "
@@ -130,8 +131,9 @@ run_t_submenu () {
 # Advanced submenu
 run_a_submenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Advanced Options"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
   echo " 2 : Create ligand toppar folders and parameters with local CGenFF"
@@ -312,8 +314,9 @@ run_a_submenu () {
 # Main menu
 runmenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Manual Launch Control for CHARMM-GUI Scripts"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " a : Advanced pre-/post-run options"
   echo " t : Transformato options"
