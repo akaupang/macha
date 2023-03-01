@@ -23,7 +23,7 @@ cgenff_path = ""          # MUST BE SET BY USER
 ################################################################################
 # Introductions are in order
 print(f"{str(' '):>90}")
-print(f"======================================================================== m   a   c   h   a")
+print(f"=======================================================================  m   a   c   h   a")
 print(f"{str(' '):>90}")
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
