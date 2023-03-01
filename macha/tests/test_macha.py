@@ -4,21 +4,27 @@ from macha.functions import Preparation, checkInput, CharmmManipulation
 import os
 import parmed as pm
 
-ligand_id = "cdk2_32"
+ligand_id = "cdk2_l32"
 parent_dir = "macha/data"
 original_dir = "original"
+
 
 def test_import():
     import parmed as pm
     import openbabel
 
+
 def test_checkInput():
 
-    protein_id,ligand_ids = checkInput(parent_dir=parent_dir, original_dir=original_dir, protein_name=None, input_ext="pdb")
+    protein_id, ligand_ids = checkInput(
+        parent_dir=parent_dir,
+        original_dir=original_dir,
+    )
 
     # Assure that all ligands are found by the function
     if not protein_id:
-        assert len(os.listdir(original_dir)) == len(ligand_ids)
+        assert len(os.listdir(f"macha/data/{original_dir}")) == len(ligand_ids)
+
 
 def test_createFolders():
 
@@ -26,18 +32,20 @@ def test_createFolders():
         parent_dir=parent_dir,
         ligand_id=ligand_id,
         original_dir=original_dir,
-        env="waterbox"
+        env="waterbox",
+        input_sanitation=False,
     )
-    
+
     pdb_macha = preparation.pm_obj
     pdb_orig = pm.load_file("macha/data/original/cdk2_l32.pdb")
-   
+
     # check if pdb file is read in correctly by parmed and compare a random atom to the original file
-    number = randint(0,9065)
+    number = randint(0, 9065)
     assert str(pdb_macha.atoms[number]) == str(pdb_orig.atoms[number])
 
 
 # Test for handling a small molecule
+
 
 @pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -51,14 +59,13 @@ def test_run_macha_for_rna():
     input_ext = "pdb"  # for testing - should be pdb
     cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
 
-    for env in ["single_strand","double_strand"]:
+    for env in ["single_strand", "double_strand"]:
         preparation = Preparation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
             original_dir=original_dir,
             env=env,
-            rna = True,
-
+            rna=True,
         )
         segids, df = preparation.checkInputType()
         print(segids)
@@ -67,7 +74,7 @@ def test_run_macha_for_rna():
         preparation.makeTFFolderStructure()
         segids, used_segids = preparation.createCRDfiles(segids, df)
 
-        print(segids,used_segids)
+        print(segids, used_segids)
         # # # # Get the toppar stream from a local CGenFF binary
         # preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
@@ -77,8 +84,8 @@ def test_run_macha_for_rna():
             original_dir=original_dir,
             resname=preparation.resname,
             env=env,
-            ion_name = "SOD",
-            ion_conc = 1.0
+            ion_name="SOD",
+            ion_conc=1.0,
         )
         # # # Copy Files from the template folder
         charmmManipulation.copyFiles()
@@ -89,5 +96,3 @@ def test_run_macha_for_rna():
         # # charmmManipulation.applyHMR()
         charmmManipulation.createOpenMMSystem()
         # charmmManipulation.createTFYamlFile()
-
-
