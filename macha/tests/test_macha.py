@@ -27,6 +27,7 @@ def test_createFolders():
         ligand_id=ligand_id,
         original_dir=original_dir,
         env="waterbox"
+        ligand_input_sanitation=True
     )
     
     pdb_macha = preparation.pm_obj

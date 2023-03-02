@@ -23,7 +23,7 @@ cgenff_path = ""          # MUST BE SET BY USER
 ################################################################################
 # Introductions are in order
 print(f"{str(' '):>90}")
-print(f"=======================================================================  m   a   c   h   a")
+print(f"======================================================================   m   a   c   h   a")
 print(f"{str(' '):>90}")
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
@@ -73,9 +73,9 @@ for ligand_id in ligand_ids:
             protein_id=protein_id,
             small_molecule=False,
             rna=False,
-            system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
-                            # be protonated by OpenBabel according to this pH
-            input_sanitation=True,
+            ligand_input_sanitation=True,   # If ligand input sanitation is selected and
+            system_ph=7.4,                  # the ligand has no hydrogens, it will be
+                                            # protonated by OpenBabel according to this pH
         )
         
         # Make a Transformato style folder structure

@@ -16,6 +16,8 @@ from openbabel import openbabel
 import string
 import numpy as np
 from .charmm_factory import CharmmFactory
+import re
+
 
 import warnings
 
@@ -46,11 +48,12 @@ def checkInput(
 
     if protein_id == None:
         print(
-            """
-        No protein was specified for ligand exchange with multiple ligands.
-        The input is thus assumed to consist either of complexes from which to create
-        waterboxes + complexes, OR of single ligands from which to create waterboxes
-        (if the latter is the case, use the -nc switch for efficiency).
+        """
+No protein was specified (or found) for ligand exchange with multiple ligands. 
+The input is thus assumed to consist either of complexes from which to create
+waterboxes + complexes, OR of single ligands from which to create waterboxes.
+If your input consists of complexes, from which you wish to only create a waterboxes,
+you should use the -nc switch for efficiency.
         """
         )
 
@@ -78,15 +81,15 @@ class Preparation:
         protein_id=None,
         small_molecule=False,
         rna=False,
+        ligand_input_sanitation=True,
         system_ph=7.4,
-        input_sanitation=True,
     ):
-
         """
         This class prepares everything for further use with CHARMM. The PDB
         files are sliced into pieces and the ligand is converted to a mol2 file.
         A local version of CGenFF creates a stream file for the ligand.
         """
+        
         self.parent_dir = parent_dir
         self.original_dir = original_dir
         self.ligand_id = ligand_id
@@ -95,47 +98,63 @@ class Preparation:
         self.env: str = env
         self.small_molecule: bool = small_molecule
         self.rna: bool = rna
-        self.input_type = None
+        self.input_type = None # what's thi again...?
         self.system_ph = system_ph        
+        self.ligand_input_sanitation: bool = ligand_input_sanitation
         
         # Distinguished treatment if the current ligand is to be merged with a protein
         if self.protein_id == None:
+            # USE CASES
+            # ligand.pdb  -> waterbox
+            # complex.pdb -> complex + waterbox
+            # complex.pdb -> waterbox
+            
+            # There is no separate protein input
+            self.orig_protein_input = None
+            
             # Original input file
             self.orig_ligand_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             )
             
-            # Optionally disabled input sanitation
-            if input_sanitation == True:
-                self.sanitizeInput(self.orig_ligand_input)
-            
-            # ENVIRONMENTS
-            # For single ligands -> waterbox
-            # Perhaps also useful for:
-            # complex.pdb -> complex + ligand (from complex) in waterbox
+            # If no protein is found or has been specified and consequently protein_id == None
+            # it is possible that a complex has been passed, with the intention of producing
+            # complex+waterbox or ONLY a waterbox - in either case the ligand and protein must be
+            # separated before the pdb file of the ligand can be passed to the ligand input
+            # sanitizer (it cannot handle proteins).
+            self.complexSeparator() 
+            # what overlaps are there with mergeToComplex?
+                
+  
             # Load the PDB file into ParmEd
             self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
+            
+            # Environment-specific routes?
             
             if self.env == "single_strand":
                 self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
                 self.pm_obj = self.pm_obj["A", :, :]    # select only CHAIN A 
                 
         else:
+            # USE CASES
+            # protein.pdb + ligand.pdb -> waterbox
+            # protein.pdb + ligand.pdb -> complex + waterbox
+
             # Original input file
             self.orig_ligand_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             )
             
-            # Optionally disabled input sanitation
-            if input_sanitation == True:
-                self.sanitizeInput(self.orig_ligand_input)
+            # Optionally disabled ligand input sanitation
+            if self.ligand_input_sanitation == True:
+                self.sanitizeLigandInput(self.orig_ligand_input)
 
+            # Load the protein file
             self.orig_protein_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb"
             )
-            # Input proteins are not sanitized!
-                        
-            # ENVIRONMENTS            
+            
+            # Different environments call for different routes                       
             if self.env == "waterbox" or self.env == "double_strand":
                 # Run like normal single ligand
                 self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
@@ -169,9 +188,9 @@ class Preparation:
             if not os.path.isdir(path):
                 raise
             
-    def sanitizeInput(self, structure_file_path):
-        import re
-        
+
+    def sanitizeLigandInput(self, structure_file_path):
+    
         # This only works for PDBs
         assert structure_file_path.endswith(".pdb")
         
@@ -264,14 +283,55 @@ class Preparation:
                     else:
                         osf.write(line)
 
+
+
+
+
+    def complexSeparator(self):
         
+        # Load the protein
+        print(f"Processing protein ...")
+        orig_protein_input = self.orig_ligand_input
+        self.pm_obj = pm.load_file(
+            orig_protein_input, structure=True
+        )
 
-
-
-
+        # What kind of protein PDB file has been provided?
+        # Remember: segids will be added if there are none
+        segids, pm_obj_df = self.checkInputType(is_complex=True)
         
-        
+        # Copy the resulting ParmEd object
+        apo_protein_pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]   
+        ligand = self.pm_obj[pm_obj_df.segid.str.contains("HET")]
 
+        # Optionally disabled ligand input sanitation
+        if self.ligand_input_sanitation == True:
+            ligand.save(
+                        f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}_LigandFromComplex.pdb",
+                        overwrite=True,
+                        )
+            self.orig_ligand_input = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}_LigandFromComplex.pdb"
+
+            self.sanitizeLigandInput(self.orig_ligand_input)
+        
+        # Load the ligand, overwriting the common ParmEd object
+        # HERE THE LIGAND WITH HYDROGENS FROM OPENBABEL MUST BE LOADED
+        print(f"Processing ligand (from): {self.ligand_id} (input typing, segid addition)")
+            
+        self.pm_obj = pm.load_file(
+            self.orig_ligand_input, structure=True
+        )
+        # Add segids to ligand ParmEd object if there are none
+        segids, pm_obj_df = self.checkInputType(is_complex=False)
+
+        ligand_pm_obj = self.pm_obj
+
+        # Overwrite the self.pm_obj by joining the copied protein and ligand
+        # ParmEd objects.
+        # NOTE: No reordering to a typical PROA, HETA, IONS, WAT/SOLV order
+        # is performed
+        self.pm_obj = apo_protein_pm_obj + ligand_pm_obj
+        
 
     def mergeToComplex(self):
         print("* * * Merge to complex * * *")
