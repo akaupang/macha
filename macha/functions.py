@@ -18,7 +18,6 @@ import numpy as np
 from .charmm_factory import CharmmFactory
 import re
 
-
 import warnings
 
 # Supress ParmEd warnings
@@ -53,7 +52,7 @@ No protein was specified (or found) for ligand exchange with multiple ligands.
 The input is thus assumed to consist either of complexes from which to create
 waterboxes + complexes, OR of single ligands from which to create waterboxes.
 If your input consists of complexes, from which you wish to only create a waterboxes,
-you should use the -nc switch for efficiency.
+you should use the -nc (--nocomplex) switch for efficiency.
         """
         )
 
@@ -94,81 +93,54 @@ class Preparation:
         self.original_dir = original_dir
         self.ligand_id = ligand_id
         self.protein_id = protein_id
+        self.ligand_pm_obj: object = None
+        self.protein_pm_obj: object = None
         self.resname = str
         self.env: str = env
         self.small_molecule: bool = small_molecule
         self.rna: bool = rna
-        self.input_type = None # what's thi again...?
         self.system_ph = system_ph        
         self.ligand_input_sanitation: bool = ligand_input_sanitation
         
-        # Distinguished treatment if the current ligand is to be merged with a protein
+        # Make folder structure for this environment
+        self.makeTFFolderStructure()
+       
+        # A general distinction is made base on whether a separate protein has been
+        # indicated by the user
         if self.protein_id == None:
             # USE CASES
             # ligand.pdb  -> waterbox
             # complex.pdb -> complex + waterbox
-            # complex.pdb -> waterbox
+            # complex.pdb -> waterbox (with -nc switch)
             
-            # There is no separate protein input
+            # There is NO separate protein input file
             self.orig_protein_input = None
             
-            # Original input file
+            # Ligand/Complex input file
             self.orig_ligand_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
             )
             
-            # If no protein is found or has been specified and consequently protein_id == None
-            # it is possible that a complex has been passed, with the intention of producing
-            # complex+waterbox or ONLY a waterbox - in either case the ligand and protein must be
-            # separated before the pdb file of the ligand can be passed to the ligand input
-            # sanitizer (it cannot handle proteins).
-            self.complexSeparator() 
-            # what overlaps are there with mergeToComplex?
-                
-  
-            # Load the PDB file into ParmEd
-            self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
-            
-            # Environment-specific routes?
-            
-            if self.env == "single_strand":
-                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
-                self.pm_obj = self.pm_obj["A", :, :]    # select only CHAIN A 
+            # Parse input
+            self.inputParser()
                 
         else:
             # USE CASES
             # protein.pdb + ligand.pdb -> waterbox
             # protein.pdb + ligand.pdb -> complex + waterbox
-
-            # Original input file
-            self.orig_ligand_input = (
-                f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
-            )
             
-            # Optionally disabled ligand input sanitation
-            if self.ligand_input_sanitation == True:
-                self.sanitizeLigandInput(self.orig_ligand_input)
-
-            # Load the protein file
+            # There IS a separate protein input file
             self.orig_protein_input = (
                 f"{self.parent_dir}/{self.original_dir}/{self.protein_id}.pdb"
             )
             
-            # Different environments call for different routes                       
-            if self.env == "waterbox" or self.env == "double_strand":
-                # Run like normal single ligand
-                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
-                
-            elif self.env == "single_strand":
-                self.pm_obj = pm.load_file(self.orig_ligand_input, structure=True)
-                self.pm_obj = self.pm_obj["A", :, :]    # select only CHAIN A
-
-            elif self.env == "complex":
-                # Start the merger function
-                self.mergeToComplex() 
-
-            else:
-                sys.exit(f"Unrecognized environment: {self.env}")
+            # Ligand/Complex input file
+            self.orig_ligand_input = (
+                f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb"
+            )
+            
+            # Parse input
+            self.inputParser()
     
     def makeTFFolderStructure(self):
         self._make_folder(f"{self.parent_dir}/config")
@@ -188,22 +160,21 @@ class Preparation:
             if not os.path.isdir(path):
                 raise
             
-
     def sanitizeLigandInput(self, structure_file_path):
     
         # This only works for PDBs
         assert structure_file_path.endswith(".pdb")
         
         # Backup original file if a backup does not exist
-        if os.path.isfile(f"{structure_file_path}.bck"):
+        if os.path.isfile(f"{structure_file_path}.org"):
             shutil.copy(
-                f"{structure_file_path}.bck",
+                f"{structure_file_path}.org",
                 structure_file_path,
             )
         else:
             shutil.copy(
                 structure_file_path,
-                f"{structure_file_path}.bck",
+                f"{structure_file_path}.org",
             )
         
         # Compile regular expressions
@@ -220,7 +191,7 @@ class Preparation:
         # - double uppercase atom names
         # - instances of duplicate atom name+number
         #
-        with open(f"{structure_file_path}.bck", "r") as isf:
+        with open(f"{structure_file_path}.org", "r") as isf:
             with open(structure_file_path, "w") as osf:
                 atom_names = []
                 for line in isf:
@@ -285,179 +256,221 @@ class Preparation:
 
 
 
-
-
-    def complexSeparator(self):
+    def inputParser(self):
         
-        # Load the protein
-        print(f"Processing protein ...")
-        orig_protein_input = self.orig_ligand_input
-        self.pm_obj = pm.load_file(
-            orig_protein_input, structure=True
-        )
-
-        # What kind of protein PDB file has been provided?
-        # Remember: segids will be added if there are none
-        segids, pm_obj_df = self.checkInputType(is_complex=True)
-        
-        # Copy the resulting ParmEd object
-        apo_protein_pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]   
-        ligand = self.pm_obj[pm_obj_df.segid.str.contains("HET")]
-
-        # Optionally disabled ligand input sanitation
-        if self.ligand_input_sanitation == True:
-            ligand.save(
-                        f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}_LigandFromComplex.pdb",
-                        overwrite=True,
-                        )
-            self.orig_ligand_input = f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}_LigandFromComplex.pdb"
-
-            self.sanitizeLigandInput(self.orig_ligand_input)
-        
-        # Load the ligand, overwriting the common ParmEd object
-        # HERE THE LIGAND WITH HYDROGENS FROM OPENBABEL MUST BE LOADED
-        print(f"Processing ligand (from): {self.ligand_id} (input typing, segid addition)")
-            
-        self.pm_obj = pm.load_file(
-            self.orig_ligand_input, structure=True
-        )
-        # Add segids to ligand ParmEd object if there are none
-        segids, pm_obj_df = self.checkInputType(is_complex=False)
-
-        ligand_pm_obj = self.pm_obj
-
-        # Overwrite the self.pm_obj by joining the copied protein and ligand
-        # ParmEd objects.
-        # NOTE: No reordering to a typical PROA, HETA, IONS, WAT/SOLV order
-        # is performed
-        self.pm_obj = apo_protein_pm_obj + ligand_pm_obj
-        
-
-    def mergeToComplex(self):
-        print("* * * Merge to complex * * *")
-        # Here, it is practical to borrow the "self.pm_obj" temporarily
-        # for both the input protein and later for the ligand. This solution
-        # benefits from the fact that most of the internal functions in this
-        # class already work on this object. The merge function will in the end
-        # restore "self.pm_obj" as the complex.
-
-        # Load the protein
-        print(f"Processing protein (input typing, segid addition, HETx removal)")
-        self.pm_obj = pm.load_file(
-            self.orig_protein_input, structure=True
-        )
-
-        # What kind of protein PDB file has been provided?
-        # Remember: segids will be added if there are none
-        segids, pm_obj_df = self.checkInputType(is_complex=True)
-
-        # Get the parts of the ParmEd object (here, the protein) that does not 
-        # contain "HET" in the segid column. No segids other than HET are excluded!
-        # Note the tilde to invert the boolean mask!
-        # Copy the resulting ParmEd object
-        apo_protein_pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
-
-        # Load the ligand, overwriting the common ParmEd object
-        # HERE THE LIGAND WITH HYDROGENS FROM OPENBABEL MUST BE LOADED
-        print(f"Processing ligand: {self.ligand_id} (input typing, segid addition)")
-        self.pm_obj = pm.load_file(
-            self.orig_ligand_input, structure=True
-        )
-        
-        # Add segids to ligand ParmEd object if there are none
-        segids, pm_obj_df = self.checkInputType(is_complex=False)
-
-        # Copy the ligand ParmEd object
-        ligand_pm_obj = self.pm_obj
-
-        # Overwrite the self.pm_obj by joining the copied protein and ligand
-        # ParmEd objects.
-        # NOTE: No reordering to a typical PROA, HETA, IONS, WAT/SOLV order
-        # is performed
-        self.pm_obj = apo_protein_pm_obj + ligand_pm_obj
-
-        print("* * *    End merge     * * *")
-
-    def checkInputType(self, is_complex=False):
-        # Since this function runs right after the __init__ function,
-        # ParmEd objects of several origins need to be handled:
-        # Ligands (or RNA) for waterboxes and ligands during mergetocomplex
-        # Proteins during mergetocomplex
-        # Complexes after mergetocomplex (actually redundant, since both ran through before the merge)
-        
-        # We will cater for two types of PDB files
-        # 1: Canonical/MAESTRO-derived PDB files
-        # 2: CHARMM-derived PDB files
+        # USE CASES
         #
-        # This distinction is made by looking for segids.
+        # TYPICAL?  INPUT
+        # YES       ligand.pdb  ->           waterbox (with ligand from ligand.pdb)
+        # YES       complex.pdb ->           waterbox (with ligand from complex.pdb)
+        # YES       complex.pdb -> complex + waterbox (with ligand from complex.pdb)
         #
-        # PDB TYPE                  CHAIN IDs       SEGIDs
-        # Canonical/MAESTRO         yes             no (element names)
-        # CHARMM PDB                no              yes
-        # CHARMM PDB ("official")   yes             yes
+        # We have:
+        # self.orig_protein_input == None
+        # self.orig_ligand_input == ligand or complex
+
+        # TYPICAL?  INPUT
+        # YES       protein.pdb + ligand.pdb ->       complex + waterbox (with ligand from ligand.pdb)
+        # YES       complex.pdb + ligand.pdb -> (new) complex + waterbox (with ligand from ligand.pdb)
+        # NO        protein.pdb + ligand.pdb ->                 waterbox (with ligand from ligand.pdb)
+        # YES       complex.pdb + ligand.pdb ->                 waterbox (with ligand from ligand.pdb)
+        #
+        # We have:
+        # self.orig_protein_input == protein or complex
+        # self.orig_ligand_input == ligand or complex
+                
         
-        # TREATMENT FOR ALL OBJECTS
-        # Remove lone pairs (if any)
-        self.pm_obj = self._remove_lp()
-
-        # Check if the user has set the protonation states of ionizable residues
-        # using either CHARMM or AMBER residue names (not quite comprehensively defined)
-        # If not, ATTENTION, all occurrences of HIS will be renamed to HSD
-        self.pm_obj = self._check_ionizable()
-
-        # Store the ParmEd object as a dataframe for later use
-        pm_obj_df = self.pm_obj.to_dataframe()        
-        
-        # THIS MAY BE THE PLACE TO DO BASIC INPUT SANITATION SUCH AS CHECKS FOR:
-        # - doubly capitalized atom names, e.g. CL, NA
-        # - atoms with the same name
-
-        # # Count the segids in the ParmEd object (if any)
-        segids = set(i.residue.segid for i in self.pm_obj)
-
-        # For RNA (some extra treatment is necessary)
-        if self.rna:
-            self.pm_obj = self._add_segids_rna(pm_obj_df)
-            self.pm_obj = self._create_tlc_rna()
-            segids = set(i.residue.segid for i in self.pm_obj)
-            pm_obj_df = self.pm_obj.to_dataframe()
-        
-        # For canonical/MAESTRO-derived PDB files containing chain IDs
-        elif segids == {""}:  # empty set of segids
-            print(f"Processing a ParmEd object without segids (e.g. from a canonical/Maestro based PDB file)")
-            # Add segids to the Parmed object (NEEDED FOR CHECK HYDROGEN FUNCTION)
-            self.pm_obj = self._add_segids(pm_obj_df)
+        if self.env == "complex":
+            # A SEPARATELY DEFINED PROTEIN IS ONLY RELEVANT IN ENVIRONMENT COMPLEX
+            if self.orig_protein_input != None:
+                self.pm_obj = pm.load_file(
+                    self.orig_protein_input, structure=True
+                )
+                
+                # REMOVE LONE PAIRS
+                self.pm_obj = self._remove_lp()
+                
+                # ADD SEGMENT IDENTIFIERS
+                print(f"Adding segment IDs to input structure")
+                pm_obj_df = self.pm_obj.to_dataframe()          
+                #self.pm_obj = self._add_segids()
+                self._add_segids()
             
-            # Update the dataframe and segid list
-            pm_obj_df = self.pm_obj.to_dataframe()     
-            segids = set(i.residue.segid for i in self.pm_obj)
-            
-            # Check for hydrogens and update the dataframe
-            self._check_for_hydrogens(is_complex=is_complex)
-            pm_obj_df = self.pm_obj.to_dataframe()     
+                # The separate protein input could be a complex
+                # In this case any HET segids will be discarded
+                self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
 
-            # Add segids to the updated Parmed object
-            self.pm_obj = self._add_segids(pm_obj_df)
+                #self.pm_obj = sep_apo_protein_pm_obj
+                #self.pm_obj = self._check_ionizable()
+                self._check_ionizable()
+                sep_apo_protein_pm_obj = self.pm_obj
+
+
+        # NO SEPARATE PROTEIN HAS BEEN DEFINED
+        if self.orig_ligand_input != None:
+            self.pm_obj = pm.load_file(
+                self.orig_ligand_input, structure=True
+            )
             
-            # Update the dataframe before it is returned
-            pm_obj_df = self.pm_obj.to_dataframe()
+            # REMOVE LONE PAIRS
+            # ASK JOHANNES ABOUT WHY WE RENEW THE PM OBJECT WHEN IT IS 
+            # A CLASS OBJECT?/WHY RETURN EXPLICITLY FROM THE FUNCTION?
+            #self.pm_obj = self._remove_lp()
+            self._remove_lp()
+
+            # ADD SEGMENT IDENTIFIERS
+            #self.pm_obj = self._add_segids()
+            self._add_segids()
             
-        # For CHARMM(-GUI)-generated PDB files
+            # Update the dataframe - IMPORTANT!
+            pm_obj_df = self.pm_obj.to_dataframe()                      
+
+            # Store the original ParmEd object
+            # - necessary since the self.pm_obj is constantly overwritten
+            pm_obj_org = self.pm_obj
+            
+            # The protein part of a complex input is only useful in the environment "complex"
+            if self.env == "complex":
+                # PROTEIN (FROM COMPLEX) - ANYTHING BUT HETs, REALLY (NOTE THE TILDE)
+                try:
+                    # Discard any HET segids from the ParmEd object
+                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
+                    pm_obj_df = self.pm_obj.to_dataframe()
+                    print(f"The 'protein' consists of "\
+                          f"segids {pm_obj_df.segid.unique()}, "\
+                          f"chains {pm_obj_df.chain.unique()}")
+                    
+                    # Being sure that all remaining components are "protein" we can
+                    # check the naming of residues
+                    self._check_ionizable()
+                    
+                    # We then store the resulting ParmEd object locally
+                    apo_protein_pm_obj = self.pm_obj
+                    
+                except IndexError: # An IndexError is thrown if the dataframe with which
+                                   # the ParmEd object is sliced above is empty.
+                    sys.exit(f"No protein was found from which to make a complex.\n"\
+                             f"If you only wanted a waterbox, please use the -nc switch.")
+            
+            # A lone ligand or a ligand from a complex is useful in both "waterbox" and 
+            # "complex" environments
+            if self.env in ["waterbox","complex"]:
+                # LIGAND (SINGLE LIGAND OR FROM COMPLEX)
+                # We reinstall the original ParmEd object and recreate its dataframe
+                self.pm_obj = pm_obj_org
+                pm_obj_df = self.pm_obj.to_dataframe()
+                
+                try:
+                    # Make a new ParmEd object discarding any non-HET entities
+                    ligand_pm_obj = self.pm_obj[pm_obj_df.segid.str.contains("HET")]
+                    ligand_pm_obj_df = ligand_pm_obj.to_dataframe()
+                    
+                    # Beginning support for multiple HETs 
+                    lig_objs = []
+                    # which relies on that ligands in the same chain with different residue 
+                    # numbers have been given different x's in HETx by _add_segids()
+                    for segid in ligand_pm_obj_df.segid.unique():
+                        current_ligand_obj = ligand_pm_obj[ligand_pm_obj_df.segid == segid]
+
+                        # Optional ligand input (HET) sanitation
+                        if self.ligand_input_sanitation == True:
+                            # Save the ligand to disk, since the sanitation function works directly
+                            # on the file
+                            current_ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid.lower()}.pdb"
+                            current_ligand_obj.save(
+                                current_ligand_path, overwrite=True,
+                                )
+
+                            #self.orig_ligand_input = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb"
+
+                            # Run the sanitizer, which will back up the incoming file to *.pdb.org and 
+                            # make a sanitized ligand with the same name as the input)
+                            self.sanitizeLigandInput(current_ligand_path)        
+
+                            # Reload the sanitized ligand
+                            sanitized_ligand_pm_obj = pm.load_file(
+                                current_ligand_path, structure=True
+                            )
+
+                            #Remove extracted ligand PDB and its backup not to clutter directory
+                            # os.remove(
+                            #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb"
+                            #     )
+                            # os.remove(
+                            #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb.org"
+                            #     )
+                            
+                            # REINSTATE THE SANTITIZED LIGAND AS THE CENTRAL PARMED OBJECT
+                            self.pm_obj = sanitized_ligand_pm_obj
+                            
+                            # REDO SOME PARSING STEPS FOR THE SANITIZED LIGAND
+                            #self.pm_obj = self._remove_lp()
+                            self._remove_lp()
+                            
+                            print(f"Adding segment IDs to a sanitized ligand") 
+                            #self.pm_obj = self._add_segids()
+                            self._add_segids()
+                        
+                        # The following are common steps, regardless of ligand sanitation
+                        print(f"Checking segid {segid} for hydrogens")
+                        self.pm_obj = current_ligand_obj
+                        self._check_for_hydrogens()
+                        
+                        lig_objs.append(self.pm_obj)
+                    
+                    # Cutting the multiple HET support short here
+                    # until the remaining functions are ready
+                    ligand_pm_obj = lig_objs[0]
+                
+                except IndexError:
+                    sys.exit(f"No HET segids were found (no ligand)")
+
+
+                
+        # NOW WE POSSIBLY HAVE THREE PARMED OBJECTS TO COMBINE:
+        # THE SEPARATE PROTEIN sep_apo_protein_pm_obj (anything not HET)
+        # THE COMPLEX PROTEIN apo_protein_pm_obj (anything not HET)
+        # THE COMPLEX/SINGLE LIGAND ligand_pm_obj (anything HET)
+
+        if self.orig_protein_input == None:
+            # There is NO separately defined protein
+            if self.env == "waterbox":
+                self.ligand_pm_obj = ligand_pm_obj
+                self.protein_pm_obj = None
+                self.pm_obj = self.ligand_pm_obj
+            elif self.env == "complex":
+                self.ligand_pm_obj = ligand_pm_obj
+                self.protein_pm_obj = apo_protein_pm_obj
+                self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+
+            elif self.env == "rna_single_strand":
+                self.ligand_pm_obj = ligand_pm_obj
+                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
+                self.protein_pm_obj = None
+                self.pm_obj = self.ligand_pm_obj           
+            else:
+                sys.exit(f"Unrecognized environment: {self.env}")
         else:
-            print(f"Processing a ParmEd object with segids (e.g. from a CHARMM PDB file)")
-            # Check for hydrogens and update the dataframe
-            self._check_for_hydrogens(is_complex=is_complex)
-            pm_obj_df = self.pm_obj.to_dataframe()     
-            
-            # Add segids to the Parmed object in case it was changed
-            self.pm_obj = self._add_segids(pm_obj_df)
-            
-            # Update the dataframe before it is returned in case it was changed
-            pm_obj_df = self.pm_obj.to_dataframe()            
-        
-        return segids, pm_obj_df
+            # There IS a separately defined protein
+            if ((self.env == "waterbox") or (self.env == "rna_double_strand")):
+                self.ligand_pm_obj = ligand_pm_obj
+                self.protein_pm_obj = None
+                self.pm_obj = self.ligand_pm_obj
+            elif self.env == "complex":
+                self.ligand_pm_obj = ligand_pm_obj
+                self.protein_pm_obj = sep_apo_protein_pm_obj# NOTE SEPARATE PROTEIN IS USED
+                self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+            elif self.env == "rna_single_strand":
+                self.ligand_pm_obj = ligand_pm_obj
+                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
+                self.protein_pm_obj = None
+                self.pm_obj = self.ligand_pm_obj
+            else:
+                sys.exit(f"Unrecognized environment: {self.env}")
+
 
     def _remove_lp(self):
+        print(f"Removing lone pairs")
         # Will check if there are lone pairs and remove them
         # CGenFF will add them later on
         lps = []
@@ -469,9 +482,10 @@ class Preparation:
         for i in range(len(lps)):
             self.pm_obj.strip(f"@{lps[i]+1-i}")
 
-        return self.pm_obj
-
+        #return self.pm_obj
+    
     def _check_ionizable(self):
+        print(f"Checking ionizable residues")
         # A preliminary list of residue names for titrable residues that indicate 
         # that the user has set them manually appears below
         # AMBER names will be converted to CHARMM names, no questions asked.
@@ -512,18 +526,19 @@ class Preparation:
                 # TODO A lookup using PROPKA or another solution could be of interest here
                 res.name = "HSD"  # ATTENTION!! Here we make all HIS to HSD
 
-        return self.pm_obj
-
-    def _check_for_hydrogens(self, is_complex=False):
+        #return self.pm_obj
+    
+    def _check_for_hydrogens(self, check_hydrogens=True):
+        print(f"Check for hydrogens: {check_hydrogens}")
         # Get the segids and dataframe
         segids = set(i.residue.segid for i in self.pm_obj)
         pm_obj_df = self.pm_obj.to_dataframe()
         
         # Normal run for ligands, etc.
-        if is_complex == False:
+        if check_hydrogens == True:
             # Exclude segments that do not need explicit hydrogens (that ICBuild/HBuild can handle)
             het_segids = [segid for segid in segids if segid[:3] not in ["PRO", "WAT", "ION", "XRD"]]
-            
+            print(f"Exclusion of most other segids than HET left us: {het_segids}")
             # THIS IS A LITTLE CLUNKY AT THE MOMENT, BUT MAY BE ADAPTED LATER FOR MULTIPLE LIGANDS*
             
             
@@ -640,13 +655,7 @@ class Preparation:
             
             else:
                 sys.exit("More than 1 HET segid found - multiple ligands are not supported!")
-            
-        # Or skip checks, in case of protein from complex
-        else:
-            print(
-                f"Skip check for hydrogens in protein-ligand complex - the apo protein\n"\
-                f"will be produced in the next step, discarding all other segids"
-            )    
+
 
     def _add_segids_rna(self, pm_obj_df):
 
@@ -678,7 +687,7 @@ class Preparation:
 
         return self.pm_obj
 
-    def _add_segids(self, pm_obj_df):
+    def _add_segids(self):
         # This function adds segids to the Parmed object from a PDB that does
         # not contain segids (only chain ids), ensuring that segids can be
         # used in making of CRD files later.
@@ -692,6 +701,7 @@ class Preparation:
         # Residues that do not correspond to normal amino acid names or
         # the names given in the exclusion list are given the segid HETx, 
         # in which x is a letter in ABCDEFGH...
+        pm_obj_df = self.pm_obj.to_dataframe()
 
         # TODO This list should be expanded to be comprehensive (look in CHARMM toppar for RESI and PRES)
         aa_res = [
@@ -734,9 +744,19 @@ class Preparation:
 
         # ions_res =[] # TODO A list of ions could be added for their particular handling
 
-        # RUDIMENTARY TEST FOR EXISTING SEGIDS (NEGATIVE)
-        # TRUE IF NOT ALL ENTRIES HAVE A SEGID
-        if len(pm_obj_df) != len([line for line in pm_obj_df.segid if line != ""]):
+        # RUDIMENTARY TEST FOR EXISTING SEGIDS
+        # The length of the ParmEd object dataframe in which the
+        # segid is not blank is compared to the length of the full dataframe
+      
+        if len(pm_obj_df) == len(pm_obj_df[pm_obj_df.segid != ""]):
+        #if len(pm_obj_df) == len(pm_obj_df.where(pm_obj_df.segid == "").dropna()): # FASTER?
+            print(f"All entries appear to have a segid") 
+                       
+        else:    
+            chids_no_segids = set(pm_obj_df.where(pm_obj_df.segid == "").chain)
+            print(f"Entities from chain IDs: {chids_no_segids} are missing segids\n"\
+                  f"Will add segids based on chain, residue name and number")
+            
             # Make a list of ABCD... for use as x in HETx
             het_letters = list(string.ascii_uppercase)
 
@@ -773,11 +793,11 @@ class Preparation:
                         else:
                             res.segid = f"HET{het_letters.pop(0)}"
                     prev_resnum = resnum
-        else:
-            print(f"All entries appear to have a segid already")
+            
+            print(f"Added segids. Current segids: {set(self.pm_obj.to_dataframe().segid)}")
 
-        return self.pm_obj
-    
+        #return self.pm_obj
+        
     def createCRDfiles(self, segids, pm_obj_df):
 
         exclude_segids = [
@@ -800,12 +820,12 @@ class Preparation:
                 used_segids.append(segid)
 
                 # WATERBOX ENVIRONMENT
-                if self.env == "waterbox": #self.env != "complex": # 2023: why not == "waterbox" ?
+                if self.env != "complex": # 2023: why not == "waterbox" ? For RNA?
                     # For ligands
                     if segid.startswith("HET"):
                         # DEBUG
-                        #print(f"Env: {self.env}, Segid: {segid}")
-                        
+                        print(f"Env: {self.env}, Segid: {segid}")
+
                         # Note the residue name for checks
                         self.resname = (
                             self.pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
@@ -823,23 +843,23 @@ class Preparation:
                             overwrite=True,
                         )
                         
-                        # If the switch is active, copy the original PDB file to the ligand folder
-                        # This seems RISKY, since this PDB file has not been vetted by checkInputType 
-                        # (e.g for hydrogen existence)
-                        if self.small_molecule:
-                            # We copy the pdf file since there shouldn't be any changes
-                            shutil.copy(
-                                f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
-                                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                            )
-                        else:
-                            # If the switch is not active, 
-                            # save the CHARMM PDB file of the ligand from the ParmEd object
- 
-                            self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
-                                f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                                overwrite=True,
-                            )
+                        # # If the switch is active, copy the original PDB file to the ligand folder
+                        # # This seems RISKY, since this PDB file has not been vetted by checkInputType 
+                        # # (e.g for hydrogen existence)
+                        # if self.small_molecule:
+                        #     # We copy the pdf file since there shouldn't be any changes
+                        #     shutil.copy(
+                        #         f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
+                        #         f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                        #     )
+                        # else:
+                        #     # If the switch is not active, 
+                        #     
+                        # save the CHARMM PDB file of the ligand from the ParmEd object
+                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                            overwrite=True,
+                        )
                     
                     # For RNA, a segid-based naming applies (instead of resname-based as above)
                     elif segid.startswith("RNA"):
@@ -855,7 +875,7 @@ class Preparation:
                 elif self.env == "complex":
                     if segid.startswith("HET"):
                         # DEBUG
-                        #print(f"Env: {self.env}, Segid: {segid}")
+                        print(f"Env: {self.env}, Segid: {segid}")
 
                         # TODO: Should this check be more generally applied?
                         # Note the residue name for checks
@@ -928,7 +948,7 @@ class Preparation:
             # CGenFF needs a mol2 file as input file
             self._create_mol2_sdf_file()
             
-            # If a ligand toppar stream file exists (from a previous rung), 
+            # If a ligand toppar stream file exists (from a previous run), 
             # we will remove it to prevent CGenFF from appending the new topology
             # and parameters at the end of the old one
             stream_file = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.str"
@@ -967,7 +987,7 @@ class Preparation:
     
     def _create_mol2_sdf_file(self):
 
-        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")
+        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")     
         obConversion = openbabel.OBConversion()
         mol = openbabel.OBMol()
                 
@@ -993,7 +1013,10 @@ class Preparation:
                 mol,
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
             )
-        
+        print(f"The following residues were loaded:")
+        for res in openbabel.OBResidueIter(mol):
+            print(f"Chain:{res.GetChain()}, Name: {res.GetName()}, #atoms: {res.GetNumAtoms()}")
+                    
         assert (mol.NumResidues()) == 1
         
         # Write new files
@@ -1105,7 +1128,7 @@ class CharmmManipulation:
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar",
             )
         except:
-            print(f"Toppar directory is already available")
+            print(f"A CHARMM toppar directory is already available")
     
     def _modifyIonsCountFile(self):
 
