@@ -85,6 +85,7 @@ for ligand_id in ligand_ids:
         print(f"_________________________________________________________________________________ {env.upper():>8}")
         print(f"{str(' '):>90}")
 
+        ########################################################################
         # Preparation of ligands
         # Instantiate class
         preparation = Preparation(
@@ -95,26 +96,26 @@ for ligand_id in ligand_ids:
             protein_id=protein_id,
             small_molecule=False,
             rna=False,
-            ligand_input_sanitation=True,   # If ligand input sanitation is selected and
-            system_ph=7.4,                  # the ligand has no hydrogens, it will be
-                                            # protonated by OpenBabel according to this pH
+            cgenff_path=cgenff_path,
+            system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
+                            # be protonated by OpenBabel according to this pH
+            ligand_input_sanitation=True,
         )
         
-        # THESE LINES COULD BE MOVED INTO THE CLASS AND CALLED IN ___INIT___ METHOD
-        # Make a Transformato style folder structure
-        #preparation.makeTFFolderStructure() # ALREADY MOVED
-        
+        # Round up the segids to be used during this pass      
         segids = set(i.residue.segid for i in preparation.pm_obj)
         pm_obj_df = preparation.pm_obj.to_dataframe()
 
         # Create CHARMM Coordinate files
         segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
-        print(f"The following segment IDs were found/assigned:    " + ", ".join(segids)) 
-        print(f"The following segment IDs were used/not excluded: " + ", ".join(used_segids))
+        print(f"Found segids {', '.join(segids)}\n"\
+              f"Used segids {', '.join(used_segids)}"
+              )
 
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
-        ############################################################################
+
+        ########################################################################
 
         # Edit the CHARMM-GUI scripts
         # Instantiate class
