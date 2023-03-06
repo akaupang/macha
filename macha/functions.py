@@ -141,6 +141,9 @@ class Preparation:
             
             # Parse input
             self.inputParser()
+            
+
+        ############################################################################        
     
     def makeTFFolderStructure(self):
         self._make_folder(f"{self.parent_dir}/config")
@@ -336,10 +339,10 @@ class Preparation:
                     # Discard any HET segids from the ParmEd object
                     self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
                     pm_obj_df = self.pm_obj.to_dataframe()
-                    print(f"The 'protein' consists of "\
-                          f"segids {pm_obj_df.segid.unique()}, "\
-                          f"chains {pm_obj_df.chain.unique()}")
-                    
+                    print(f"The 'protein' consists of segid/chain "\
+                          f"{', '.join(['/'.join([seg,ch]) for seg,ch in zip(pm_obj_df.segid.unique(), pm_obj_df.chain.unique())])}"
+                    )
+                          
                     # Being sure that all remaining components are "protein" we can
                     # check the naming of residues
                     self._check_ionizable()
@@ -381,8 +384,6 @@ class Preparation:
                                 current_ligand_path, overwrite=True,
                                 )
 
-                            #self.orig_ligand_input = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb"
-
                             # Run the sanitizer, which will back up the incoming file to *.pdb.org and 
                             # make a sanitized ligand with the same name as the input)
                             self.sanitizeLigandInput(current_ligand_path)        
@@ -392,14 +393,6 @@ class Preparation:
                                 current_ligand_path, structure=True
                             )
 
-                            #Remove extracted ligand PDB and its backup not to clutter directory
-                            # os.remove(
-                            #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb"
-                            #     )
-                            # os.remove(
-                            #     f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid}.pdb.org"
-                            #     )
-                            
                             # REINSTATE THE SANTITIZED LIGAND AS THE CENTRAL PARMED OBJECT
                             self.pm_obj = sanitized_ligand_pm_obj
                             
@@ -418,15 +411,13 @@ class Preparation:
                         
                         lig_objs.append(self.pm_obj)
                     
-                    # Cutting the multiple HET support short here
+                    # Cut the multiple HET support short here
                     # until the remaining functions are ready
                     ligand_pm_obj = lig_objs[0]
                 
                 except IndexError:
                     sys.exit(f"No HET segids were found (no ligand)")
 
-
-                
         # NOW WE POSSIBLY HAVE THREE PARMED OBJECTS TO COMBINE:
         # THE SEPARATE PROTEIN sep_apo_protein_pm_obj (anything not HET)
         # THE COMPLEX PROTEIN apo_protein_pm_obj (anything not HET)
@@ -445,7 +436,8 @@ class Preparation:
 
             elif self.env == "rna_single_strand":
                 self.ligand_pm_obj = ligand_pm_obj
-                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
+                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A 
+                                                                      # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
                 self.protein_pm_obj = None
                 self.pm_obj = self.ligand_pm_obj           
             else:
@@ -463,6 +455,7 @@ class Preparation:
             elif self.env == "rna_single_strand":
                 self.ligand_pm_obj = ligand_pm_obj
                 self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
+                                                                      # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
                 self.protein_pm_obj = None
                 self.pm_obj = self.ligand_pm_obj
             else:
@@ -538,7 +531,7 @@ class Preparation:
         if check_hydrogens == True:
             # Exclude segments that do not need explicit hydrogens (that ICBuild/HBuild can handle)
             het_segids = [segid for segid in segids if segid[:3] not in ["PRO", "WAT", "ION", "XRD"]]
-            print(f"Exclusion of most other segids than HET left us: {het_segids}")
+            print(f"Exclusion of most other segids than HET left us with: {', '.join(het_segids)}")
             # THIS IS A LITTLE CLUNKY AT THE MOMENT, BUT MAY BE ADAPTED LATER FOR MULTIPLE LIGANDS*
             
             
@@ -754,7 +747,7 @@ class Preparation:
                        
         else:    
             chids_no_segids = set(pm_obj_df.where(pm_obj_df.segid == "").chain)
-            print(f"Entities from chain IDs: {chids_no_segids} are missing segids\n"\
+            print(f"Entities from chain IDs: {', '.join(chids_no_segids)} are missing segids\n"\
                   f"Will add segids based on chain, residue name and number")
             
             # Make a list of ABCD... for use as x in HETx
@@ -794,7 +787,7 @@ class Preparation:
                             res.segid = f"HET{het_letters.pop(0)}"
                     prev_resnum = resnum
             
-            print(f"Added segids. Current segids: {set(self.pm_obj.to_dataframe().segid)}")
+            print(f"Added segids. Current segids: {', '.join(set(self.pm_obj.to_dataframe().segid))}")
 
         #return self.pm_obj
         
@@ -930,7 +923,7 @@ class Preparation:
         cgenff_output = None
 
         # If no particular path is given, check whether CGenFF is available
-        if cgenff_path == False:
+        if ((cgenff_path == False) or (cgenff_path == "")):
             cgenff_path = shutil.which("cgenff")
             if cgenff_path == None:
                 print(f"This function requires cgenff.\n"\
@@ -987,7 +980,6 @@ class Preparation:
     
     def _create_mol2_sdf_file(self):
 
-        print(f"Converting ligand {self.ligand_id} to MOL2 and SDF files")     
         obConversion = openbabel.OBConversion()
         mol = openbabel.OBMol()
                 
@@ -1013,9 +1005,11 @@ class Preparation:
                 mol,
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
             )
-        print(f"The following residues were loaded:")
-        for res in openbabel.OBResidueIter(mol):
-            print(f"Chain:{res.GetChain()}, Name: {res.GetName()}, #atoms: {res.GetNumAtoms()}")
+        
+        print(f"Converting ligand {self.ligand_id} ({mol.GetFormula()}) to MOL2 and SDF files\n"\
+              f"The OBMol object consists of the following residues (chain/name/#atoms): "\
+              f"{', '.join(['/'.join([res.GetChain(), res.GetName(), str(res.GetNumAtoms())]) for res in openbabel.OBResidueIter(mol)])}"
+            )
                     
         assert (mol.NumResidues()) == 1
         
