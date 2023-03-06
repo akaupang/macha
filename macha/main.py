@@ -96,7 +96,6 @@ for ligand_id in ligand_ids:
             protein_id=protein_id,
             small_molecule=False,
             rna=False,
-            cgenff_path=cgenff_path,
             system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
                             # be protonated by OpenBabel according to this pH
             ligand_input_sanitation=True,
