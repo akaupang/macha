@@ -78,7 +78,7 @@ for ligand_id in ligand_ids:
     # Pretty printing
     print(f"__________________________________________________________________________________________")
     print(f"{str(' '):>90}")
-    print(f"Processing ligand {ligand_id}")
+    print(f"Processing {ligand_id}")
 
     for env in envs:
         # Announce the current environment
@@ -94,26 +94,23 @@ for ligand_id in ligand_ids:
             ligand_id=ligand_id,
             env=env,
             protein_id=protein_id,
-            small_molecule=False,
             rna=False,
             system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
                             # be protonated by OpenBabel according to this pH
             ligand_input_sanitation=True,
         )
         
-        # Round up the segids to be used during this pass      
-        segids = set(i.residue.segid for i in preparation.pm_obj)
+        # Round up the segids to be used during this pass 
         pm_obj_df = preparation.pm_obj.to_dataframe()
+        segids = pm_obj_df.segid.unique()
 
         # Create CHARMM Coordinate files
         segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
-        print(f"Found segids {', '.join(segids)}\n"\
-              f"Used segids {', '.join(used_segids)}"
+        print(f"CRD Generation: Found segids {', '.join(segids)} and used segids {', '.join(used_segids)}"
               )
 
         # Get the toppar stream from a local CGenFF binary
         preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
-
         ########################################################################
 
         # Edit the CHARMM-GUI scripts

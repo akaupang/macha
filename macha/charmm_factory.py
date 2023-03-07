@@ -22,6 +22,8 @@ read coor unit 10 card resid
         
             # PROTEIN
             elif env != "waterbox" and segi not in [
+                "PROB",
+                "PROC",
                 "HETA",
                 "HETB",
                 "HETC",
