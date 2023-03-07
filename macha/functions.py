@@ -52,8 +52,8 @@ def checkInput(
 No protein was specified (or found) for ligand exchange with multiple ligands. 
 The input is thus assumed to consist either of complexes from which to create
 waterboxes + complexes, OR of single ligands from which to create waterboxes.
-If your input consists of complexes, from which you wish to only create a waterboxes,
-you should use the -nc (--nocomplex) switch for efficiency.
+If your input consists of complexes, and you only wish to create waterboxes with 
+the complexed ligands, you should use the -nc (--nocomplex) switch for efficiency.
         """
         )
 
@@ -337,8 +337,18 @@ class Preparation:
                 # PROTEIN (FROM COMPLEX) - ANYTHING BUT HETs, REALLY (NOTE THE TILDE)
                 try:
                     # Discard any HET segids from the ParmEd object
-                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
+                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")] # THIS IS NOT THROWING AN ERROR AS EXPECTED
                     pm_obj_df = self.pm_obj.to_dataframe()
+                    
+                except IndexError: # An IndexError is thrown if the dataframe with which
+                                   # the ParmEd object is sliced above is empty.
+                    sys.exit(f"No protein was found from which to make a complex.\n"\
+                             f"If you only wanted a waterbox, please use the -nc switch.")
+                    
+                if pm_obj_df.empty:
+                    print(f"No protein was found in the input from which to make a complex")
+                    apo_protein_pm_obj = None
+                else:
                     print(f"The 'protein' consists of segid/chain "\
                           f"{', '.join(['/'.join([seg,ch]) for seg,ch in zip(pm_obj_df.segid.unique(), pm_obj_df.chain.unique())])}"
                     )
@@ -350,10 +360,7 @@ class Preparation:
                     # We then store the resulting ParmEd object locally
                     apo_protein_pm_obj = self.pm_obj
                     
-                except IndexError: # An IndexError is thrown if the dataframe with which
-                                   # the ParmEd object is sliced above is empty.
-                    sys.exit(f"No protein was found from which to make a complex.\n"\
-                             f"If you only wanted a waterbox, please use the -nc switch.")
+
             
             # A lone ligand or a ligand from a complex is useful in both "waterbox" and 
             # "complex" environments
@@ -411,9 +418,11 @@ class Preparation:
                             # Reinstall the segid and resname that was lost in the above
                             # We are fairly sure this HET only consists of one residue, but just to be sure;
                             for res in sanitized_ligand_pm_obj.residues:
-                                print(f"Setting segid to {segid}")
+                                # Debug
+                                #print(f"Setting segid to {segid}")
                                 res.segid = segid
-                                print(f"Setting resname to {resname}")
+                                # Debug
+                                #print(f"Setting resname to {resname}")
                                 res.name = resname
 
                             # REINSTATE THE SANTITIZED LIGAND AS THE CENTRAL PARMED OBJECT
@@ -453,9 +462,13 @@ class Preparation:
                 self.protein_pm_obj = None
                 self.pm_obj = self.ligand_pm_obj
             elif self.env == "complex":
-                self.ligand_pm_obj = ligand_pm_obj
-                self.protein_pm_obj = apo_protein_pm_obj
-                self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+                if apo_protein_pm_obj == None: # THE INTERNAL NC SWITCH
+                    pass
+                    # TRIGGER
+                else:
+                    self.ligand_pm_obj = ligand_pm_obj
+                    self.protein_pm_obj = apo_protein_pm_obj
+                    self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
 
             elif self.env == "rna_single_strand":
                 self.ligand_pm_obj = ligand_pm_obj
@@ -501,7 +514,7 @@ class Preparation:
         #return self.pm_obj
     
     def _check_ionizable(self):
-        print(f"Checking ionizable residues")
+        print(f"Checking ionizable amino acid residue names")
         # A preliminary list of residue names for titrable residues that indicate 
         # that the user has set them manually appears below
         # AMBER names will be converted to CHARMM names, no questions asked.
@@ -519,12 +532,13 @@ class Preparation:
             "GLUP",
         ]
 
-        for (
-            res
-        ) in (
-            self.pm_obj.residues
-        ):  
+        # Documentation trigger switches
+        his_convert = False
+        ion_convert = False
+        
+        for res in self.pm_obj.residues:  
             if res.name in ionized_res:
+                ion_convert = True
                 # Harmonize to CHARMM names (from AMBER names)
                 # TODO This section should be expanded to be comprehensive
                 if res.name == "HID":
@@ -539,9 +553,16 @@ class Preparation:
                     pass
 
             elif res.name == "HIS":
+                his_convert = True
                 # TODO A lookup using PROPKA or another solution could be of interest here
                 res.name = "HSD"  # ATTENTION!! Here we make all HIS to HSD
-
+            
+        # Report on what happened - could upgrade to granular reporting with residue number + name
+        if ion_convert == True:
+            print(f"One or more ionized amino acid residue names were converted to CHARMM format")
+        if his_convert == True:
+            print(f"WARNING: One or more HIS residues were renamed to HSD")
+                
         #return self.pm_obj
     
     def _check_for_hydrogens(self):
@@ -671,9 +692,11 @@ class Preparation:
                 # Reinstall segid and resname that was lost in the above
                 # We are fairly sure this HET only consists of one residue, but just to be sure;
                 for res in self.pm_obj.residues:
-                    print(f"Setting segid to {segid}")
+                    # Debug
+                    #print(f"Setting segid to {segid}")
                     res.segid = segid
-                    print(f"Setting resname to {self.resname}")
+                    # Debug
+                    #print(f"Setting resname to {self.resname}")
                     res.name = self.resname
                 
                 print(
