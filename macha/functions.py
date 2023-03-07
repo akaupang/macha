@@ -79,6 +79,7 @@ class Preparation:
         original_dir,
         ligand_id,
         env,
+        cgenff_path,
         protein_id=None,
         rna=False,
         ligand_input_sanitation=True,
@@ -102,7 +103,7 @@ class Preparation:
         self.rna: bool = rna
         self.system_ph = system_ph        
         self.ligand_input_sanitation: bool = ligand_input_sanitation
-        
+        self.cgenff_path: str = cgenff_path
         # Class variables
         # FILTERS START        
         Preparation.segidfilter = [
@@ -495,8 +496,8 @@ class Preparation:
                         self.pm_obj = current_ligand_obj
                     
                     #DEBUG
-                    print(f"DF AFTER LIGAND SANITATION:\n"\
-                          f"{self.pm_obj.to_dataframe()}\n")
+                    # print(f"DF AFTER LIGAND SANITATION:\n"\
+                    #       f"{self.pm_obj.to_dataframe()}\n")
                     
                     # The following are common steps, regardless of ligand sanitation
                     self._remove_lp()
@@ -519,51 +520,64 @@ class Preparation:
         # THE SEPARATE PROTEIN sep_apo_protein_pm_obj (anything not HET)
         # THE COMPLEX PROTEIN apo_protein_pm_obj (anything not HET)
         # THE COMPLEX/SINGLE LIGAND ligand_pm_obj (anything HET)
-
+        self.pm_objs = []
         if self.orig_protein_input == None:
             # There is NO separately defined protein
             if self.env == "waterbox":
-                self.ligand_pm_obj = ligand_pm_obj
-                self.protein_pm_obj = None
-                self.pm_obj = self.ligand_pm_obj
+                self.pm_objs.append(ligand_pm_obj)
+                # self.ligand_pm_obj = ligand_pm_obj
+                # self.protein_pm_obj = None
+                # self.pm_obj = self.ligand_pm_obj
             elif self.env == "complex":
                 if apo_protein_pm_obj == None: # CURRENTLY THIS HALTS THE COMPLEX RUN
                     sys.exit(f"No protein was found from which to make a complex.\n"\
                              f"If you only wanted a waterbox, please use the -nc switch.")
                 else:
-                    self.ligand_pm_obj = ligand_pm_obj
-                    print(f"{self.env.upper()}: LIGAND DF BEFORE MERGE:\n"\
-                          f"{self.ligand_pm_obj.to_dataframe()}\n")
-                    self.protein_pm_obj = apo_protein_pm_obj
-                    self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
-                    #DEBUG
-                    print(f"{self.env.upper()}: DF AFTER MERGE:\n"\
-                            f"{self.pm_obj.to_dataframe()}\n")
+                    # self.ligand_pm_obj = ligand_pm_obj
+                    # print(f"{self.env.upper()}: LIGAND DF BEFORE MERGE:\n"\
+                    #       f"{self.ligand_pm_obj.to_dataframe()}\n")
+                    # self.protein_pm_obj = apo_protein_pm_obj
+                    # self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+                    # #DEBUG
+                    # print(f"{self.env.upper()}: DF AFTER MERGE:\n"\
+                    #         f"{self.pm_obj.to_dataframe()}\n")
+                    self.pm_objs.append(apo_protein_pm_obj)
+                    self.pm_objs.append(ligand_pm_obj)
+
 
             elif self.env == "rna_single_strand":
-                self.ligand_pm_obj = ligand_pm_obj
-                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A 
-                                                                      # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
-                self.protein_pm_obj = None
-                self.pm_obj = self.ligand_pm_obj           
+                # self.ligand_pm_obj = ligand_pm_obj
+                # self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A 
+                #                                                       # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
+                # self.protein_pm_obj = None
+                # self.pm_obj = self.ligand_pm_obj   
+                self.pm_objs.append(ligand_pm_obj)
+
             else:
                 sys.exit(f"Unrecognized environment: {self.env}")
         else:
             # There IS a separately defined protein
-            if ((self.env == "waterbox") or (self.env == "rna_double_strand")):
-                self.ligand_pm_obj = ligand_pm_obj
-                self.protein_pm_obj = None
-                self.pm_obj = self.ligand_pm_obj
+            if (self.env == "waterbox"):
+                # self.ligand_pm_obj = ligand_pm_obj
+                # self.protein_pm_obj = None
+                # self.pm_obj = self.ligand_pm_obj
+                self.pm_objs.append(ligand_pm_obj)
+
             elif self.env == "complex":
-                self.ligand_pm_obj = ligand_pm_obj
-                self.protein_pm_obj = sep_apo_protein_pm_obj# NOTE SEPARATE PROTEIN IS USED
-                self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+                # self.ligand_pm_obj = ligand_pm_obj
+                # self.protein_pm_obj = sep_apo_protein_pm_obj# NOTE SEPARATE PROTEIN IS USED
+                # self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+                self.pm_objs.append(sep_apo_protein_pm_obj)
+                self.pm_objs.append(ligand_pm_obj)   
+                             
             elif self.env == "rna_single_strand":
-                self.ligand_pm_obj = ligand_pm_obj
-                self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
-                                                                      # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
-                self.protein_pm_obj = None
-                self.pm_obj = self.ligand_pm_obj
+                # self.ligand_pm_obj = ligand_pm_obj
+                # self.ligand_pm_obj = self.ligand_pm_obj["A", :, :]    # select only CHAIN A
+                #                                                       # SHOULD THIS FILTERING BE APPLIED SOMEWHERE ELSE?
+                # self.protein_pm_obj = None
+                # self.pm_obj = self.ligand_pm_obj
+                self.pm_objs.append(ligand_pm_obj)
+
             else:
                 sys.exit(f"Unrecognized environment: {self.env}")
 
@@ -782,8 +796,8 @@ class Preparation:
                     f" hydrogens to residue {res.name} for pH {self.system_ph:.1f}"
                 )
                 # DEBUG
-                print(f"DF FROM HYDROGENATION:\n"\
-                      f"{self.pm_obj.to_dataframe()}\n")
+                # print(f"DF FROM HYDROGENATION:\n"\
+                #       f"{self.pm_obj.to_dataframe()}\n")
                 
                 # DEBUG
                 # # Resave the ParmEd object to view how it was perceived
@@ -1038,143 +1052,156 @@ class Preparation:
         #return self.pm_obj
         
     def createCRDfiles(self):
-        pm_obj_df = self.pm_obj.to_dataframe()
-        segids = pm_obj_df.segid.unique()
-        print(pm_obj_df)
+        #pm_obj_df = self.pm_obj.to_dataframe()
+        #segids = pm_obj_df.segid.unique()
+        #print(pm_obj_df)
+        
         used_segids = []
-        for segid in segids:
-            if segid not in Preparation.segidfilter: # SHOULD BE UNNECESSARY AT THIS POINT - SHOULD RATHER CATER FOR MULTIPLE
-                # Store in the segids to be given to CharmmManipulation
-                used_segids.append(segid)
+        #for segid in segids:
+            #if segid not in Preparation.segidfilter: # SHOULD BE UNNECESSARY AT THIS POINT - SHOULD RATHER CATER FOR MULTIPLE
+        for pm_obj in self.pm_objs:
+            pm_obj_df = pm_obj.to_dataframe()
+            segid = pm_obj_df.segid.unique()
+            if len(segid) == 1:
+                segid = str(segid[0])
+            else:
+                sys.exit(f"More than one segid: {segid}")
+            
+            # Store in the segids to be given to CharmmManipulation
+            used_segids.append(segid)
 
-                # WATERBOX ENVIRONMENT
-                if ((self.env == "waterbox") or (self.env == "rna_single_strand")):
-                    # For ligands
-                    if segid.startswith("HET"):
-                        # DEBUG
-                        #print(f"Env: {self.env}, Segid: {segid}")
+            # WATERBOX ENVIRONMENT
+            if ((self.env == "waterbox") or (self.env == "rna_single_strand")):
+                # For ligands
+                if segid.startswith("HET"):
+                    # DEBUG
+                    #print(f"Env: {self.env}, Segid: {segid}")
 
-                        # Note the residue name for checks
-                        self.resname = (
-                            self.pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
-                        )
-                        # resname should be a 3 or 4 letter code
-                        assert len(self.resname) < 5
+                    # Note the residue name for checks
+                    self.resname = (
+                        pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
+                    )
 
-                        # Make a folder for the ligand files in the waterbox directory
-                        self._make_folder(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
-                        )
-                        
-                        #DEBUG
-                        print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
-                              f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
-                        
-                        # Write the CHARMM CRD file from the ParmEd object
-                        self.pm_obj[pm_obj_df.segid == segid].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        
-                        # # If the switch is active, copy the original PDB file to the ligand folder
-                        # # This seems RISKY, since this PDB file has not been vetted by checkInputType 
-                        # # (e.g for hydrogen existence)
-                        # if self.small_molecule:
-                        #     # We copy the pdf file since there shouldn't be any changes
-                        #     shutil.copy(
-                        #         f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
-                        #         f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                        #     )
-                        # else:
-                        #     # If the switch is not active, 
-                        #     
-                        # DEBUG
-                        # print(f"INSPECT LIGAND DF:\n"\
-                        #       f"{self.pm_obj.to_dataframe()}\n")
+                    # resname should be a 3 or 4 letter code
+                    assert len(self.resname) < 5
 
-                        # Save a PDB file of the ligand from the ParmEd object
-                        # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
-                        # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
-                        self.pm_obj[pm_obj_df.segid == segid].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                            overwrite=True,
-                        )
+                    # Make a folder for the ligand files in the waterbox directory
+                    self._make_folder(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
+                    )
                     
-                    # For RNA, a segid-based naming applies (instead of resname-based as above)
-                    elif segid.startswith("RNA"):
-                        # DEBUG
-                        #print(f"env: {self.env}, segid: {segid}")
-    
-                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
+                    #DEBUG
+                    # print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
+                    #         f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
+                    
+                    # Write the CHARMM CRD file from the ParmEd object
+                    pm_obj[pm_obj_df.segid == segid].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                        overwrite=True,
+                    )
+                    
+                    # # If the switch is active, copy the original PDB file to the ligand folder
+                    # # This seems RISKY, since this PDB file has not been vetted by checkInputType 
+                    # # (e.g for hydrogen existence)
+                    # if self.small_molecule:
+                    #     # We copy the pdf file since there shouldn't be any changes
+                    #     shutil.copy(
+                    #         f"{self.parent_dir}/{self.original_dir}/{self.ligand_id}.pdb",
+                    #         f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                    #     )
+                    # else:
+                    #     # If the switch is not active, 
+                    #     
+                    # DEBUG
+                    # print(f"INSPECT LIGAND DF:\n"\
+                    #       f"{self.pm_obj.to_dataframe()}\n")
 
-                # COMPLEX ENVIRONMENT
-                elif self.env == "complex":
-                    if segid.startswith("HET"):
-                        # DEBUG
-                        #print(f"Env: {self.env}, Segid: {segid}")
+                    # Save a PDB file of the ligand from the ParmEd object
+                    # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
+                    # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
+                    pm_obj[pm_obj_df.segid == segid].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                        overwrite=True,
+                    )
+                    self.getTopparFromLocalCGenFF(self.cgenff_path)
+                
+                # For RNA, a segid-based naming applies (instead of resname-based as above)
+                elif segid.startswith("RNA"):
+                    # DEBUG
+                    #print(f"env: {self.env}, segid: {segid}")
 
-                        # TODO: Should this check be more generally applied?
-                        # Note the residue name for checks
-                        self.resname = (
-                            self.pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
-                        )
-                        # resname should be a 3 or 4 letters code
-                        assert len(self.resname) < 5
+                    pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                        overwrite=True,
+                    )
 
-                        # Make a folder for the ligand in the complex directory
-                        self._make_folder(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
-                        )
-                        
-                        #DEBUG
-                        # pm_obj_df = self.pm_obj.to_dataframe()
-                        # het_obj = self.pm_obj[pm_obj_df.segid == segid]
-                        # print(het_obj.to_dataframe())
-                        
-                        print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
-                              f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
-                        
-                        # Save the CHARMM CRD file of the ligand from the ParmEd object
-                        self.pm_obj[pm_obj_df.segid == segid].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        
-                        # Save a PDB file of the ligand from the ParmEd object
-                        # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
-                        # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
-                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
-                            overwrite=True,
-                        )
+            # COMPLEX ENVIRONMENT
+            elif self.env == "complex":
+                if segid.startswith("HET"):
+                    # DEBUG
+                    #print(f"Env: {self.env}, Segid: {segid}")
 
-                    else: 
-                        # DEBUG
-                        #print(f"Env: {self.env}, Segid: {segid}")
+                    # TODO: Should this check be more generally applied?
+                    # Note the residue name for checks
+                    self.resname = (
+                        pm_obj[pm_obj_df.segid == f"{segid}"].residues[0].name
+                    )
+                    # resname should be a 3 or 4 letters code
+                    assert len(self.resname) < 5
 
-                        # Save the protein, as well as eventual other segids,
-                        # as CHARMM CRD and -PDB files, directly in the complex directory
-                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
-                            overwrite=True,
-                        )
-                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
-                            f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.pdb",
-                            overwrite=True,
-                        )
-                else:
-                    # Alert if unsupported environments are requested or if input has typos
-                    sys.exit(f"Unrecognized environment: {self.env}")
+                    # Make a folder for the ligand in the complex directory
+                    self._make_folder(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
+                    )
+                    
+                    #DEBUG
+                    # pm_obj_df = self.pm_obj.to_dataframe()
+                    # het_obj = self.pm_obj[pm_obj_df.segid == segid]
+                    # print(het_obj.to_dataframe())
+                    
+                    # print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
+                    #         f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
+                    
+                    # Save the CHARMM CRD file of the ligand from the ParmEd object
+                    pm_obj[pm_obj_df.segid == segid].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                        overwrite=True,
+                    )
+                    
+                    # Save a PDB file of the ligand from the ParmEd object
+                    # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
+                    # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
+                    pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
+                        overwrite=True,
+                    )
+                    self.getTopparFromLocalCGenFF(self.cgenff_path)
 
-        return segids, used_segids
+                else: 
+                    # DEBUG
+                    #print(f"Env: {self.env}, Segid: {segid}")
+
+                    # Save the protein, as well as eventual other segids,
+                    # as CHARMM CRD and -PDB files, directly in the complex directory
+                    pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
+                        overwrite=True,
+                    )
+                    pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                        f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.pdb",
+                        overwrite=True,
+                    )
+            else:
+                # Alert if unsupported environments are requested or if input has typos
+                sys.exit(f"Unrecognized environment: {self.env}")
+
+        return used_segids
     
     def getTopparFromLocalCGenFF(
         self,
         cgenff_path=False,
     ):
+                
         cgenff_bin = None
         cgenff_output = None
 
