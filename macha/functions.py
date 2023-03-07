@@ -16,7 +16,7 @@ from openbabel import openbabel
 from openbabel import pybel
 import string
 import numpy as np
-from .charmm_factory import CharmmFactory
+#from .charmm_factory import CharmmFactory
 import re
 import natsort
 
@@ -89,7 +89,7 @@ class Preparation:
         files are sliced into pieces and the ligand is converted to a mol2 file.
         A local version of CGenFF creates a stream file for the ligand.
         """
-        
+        # Instance variables
         self.parent_dir = parent_dir
         self.original_dir = original_dir
         self.ligand_id = ligand_id
@@ -103,8 +103,9 @@ class Preparation:
         self.system_ph = system_ph        
         self.ligand_input_sanitation: bool = ligand_input_sanitation
         
+        # Class variables
         # FILTERS START        
-        self.segidfilter: list = [
+        Preparation.segidfilter = [
             "PROB",
             "PROC",
             "PROD",
@@ -302,53 +303,77 @@ class Preparation:
         # self.orig_protein_input == protein or complex
         # self.orig_ligand_input == ligand or complex
                 
-        
+        # A SEPARATELY DEFINED PROTEIN IS ONLY RELEVANT IN ENVIRONMENT COMPLEX
+        # SO WE WILL NOT EVEN LOOK FOR IT WHEN IN THE WATERBOX ENVIRONMENT
         if self.env == "complex":
-            # A SEPARATELY DEFINED PROTEIN IS ONLY RELEVANT IN ENVIRONMENT COMPLEX
             if self.orig_protein_input != None:
                 self.pm_obj = pm.load_file(
                     self.orig_protein_input, structure=True
                 )
-                
+                               
                 # REMOVE LONE PAIRS
-                self.pm_obj = self._remove_lp()
+                self._remove_lp()
                 
                 # ADD SEGMENT IDENTIFIERS
                 print(f"Adding segment IDs to input structure")
-                pm_obj_df = self.pm_obj.to_dataframe()          
-                #self.pm_obj = self._add_segids()
                 self._add_segids()
+                
+                # FILTER FILTER FILTER
+                # Update the object based on the input filter and update the dataframe
+                self.pm_obj = self.pm_obj[~pm_obj_df.segid.isin(Preparation.segidfilter)]
+                print(f"Excluding segids "\
+                        f"{', '.join(pm_obj_df[pm_obj_df.segid.isin(Preparation.segidfilter)].segid.unique())}"\
+                        f" based on segid input filter")
+                pm_obj_df = self.pm_obj.to_dataframe()    
             
-                # The separate protein input could be a complex
-                # In this case any HET segids will be discarded
-                self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
+                # SLICE OUT THE RELEVANT PARTS - IN THIS CASE THE PROTEIN (NOT HET)
+                try:
+                    # The separate protein input could be a complex
+                    # In this case any HET segids will be discarded
+                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")]
+                    pm_obj_df = self.pm_obj.to_dataframe()    
+                except IndexError: # An IndexError is thrown if the dataframe with which
+                                   # the ParmEd object is sliced above is empty.
+                    sys.exit(f"No protein was found from which to make a complex.\n"\
+                             f"If you only wanted a waterbox, please use the -nc switch.")
 
-                #self.pm_obj = sep_apo_protein_pm_obj
-                #self.pm_obj = self._check_ionizable()
+                # Check ionizable amino acid residue names
                 self._check_ionizable()
+                
+                # Store the ParmEd object as a local variable
                 sep_apo_protein_pm_obj = self.pm_obj
-
+        
+            # If there is no separate protein input, the resulting object is None        
+            else:
+                sep_apo_protein_pm_obj = None
+        # In the waterbox environment a separate protein is meaningless, so its object is None
+        else:
+            sep_apo_protein_pm_obj = None
+            
 
         # NO SEPARATE PROTEIN HAS BEEN DEFINED
         if self.orig_ligand_input != None:
             self.pm_obj = pm.load_file(
                 self.orig_ligand_input, structure=True
             )
-            
             # REMOVE LONE PAIRS
-            # ASK JOHANNES ABOUT WHY WE RENEW THE PM OBJECT WHEN IT IS 
-            # A CLASS OBJECT?/WHY RETURN EXPLICITLY FROM THE FUNCTION?
-            #self.pm_obj = self._remove_lp()
             self._remove_lp()
 
             # ADD SEGMENT IDENTIFIERS
-            #self.pm_obj = self._add_segids()
             self._add_segids()
             
             # Update the dataframe - IMPORTANT!
-            pm_obj_df = self.pm_obj.to_dataframe()                      
-
-            # Store the original ParmEd object
+            pm_obj_df = self.pm_obj.to_dataframe()   
+            
+            # FILTER FILTER FILTER
+            # Update the object based on the input filter and update the dataframe
+            self.pm_obj = self.pm_obj[~pm_obj_df.segid.isin(Preparation.segidfilter)]
+            print(f"Excluding segids "\
+                    f"{', '.join(pm_obj_df[pm_obj_df.segid.isin(Preparation.segidfilter)].segid.unique())}"\
+                    f" based on segid input filter")
+            pm_obj_df = self.pm_obj.to_dataframe()            
+                            
+            # Store the "original" (filtered) ParmEd object
             # - necessary since the self.pm_obj is constantly overwritten
             pm_obj_org = self.pm_obj
             
@@ -357,7 +382,7 @@ class Preparation:
                 # PROTEIN (FROM COMPLEX) - ANYTHING BUT HETs, REALLY (NOTE THE TILDE)
                 try:
                     # Discard any HET segids from the ParmEd object
-                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")] # THIS IS NOT THROWING AN ERROR AS EXPECTED
+                    self.pm_obj = self.pm_obj[~pm_obj_df.segid.str.contains("HET")] # THROWS ERRORS IN TERMINAL IF EMPTY
                     pm_obj_df = self.pm_obj.to_dataframe()
                     
                 except IndexError: # An IndexError is thrown if the dataframe with which
@@ -380,95 +405,115 @@ class Preparation:
                     # We then store the resulting ParmEd object locally
                     apo_protein_pm_obj = self.pm_obj
                     
-
-            
             # A lone ligand or a ligand from a complex is useful in both "waterbox" and 
             # "complex" environments
             if self.env in ["waterbox","complex"]:
                 # LIGAND (SINGLE LIGAND OR FROM COMPLEX)
-                # We reinstall the original ParmEd object and recreate its dataframe
+                # We reinstall the "original" (filtered) ParmEd object and recreate its dataframe
                 self.pm_obj = pm_obj_org
                 pm_obj_df = self.pm_obj.to_dataframe()
-                
+               
                 try:
-                    # Make a new ParmEd object discarding any non-HET entities
+                    # Make a new ParmEd object and dataframe discarding any non-HET entities
                     ligand_pm_obj = self.pm_obj[pm_obj_df.segid.str.contains("HET")]
-                    
-                    # Since rather often ligands in x-ray cocrystal structures carry the same
-                    # residue names, we quite brutally rename the residues, giving them an appended letter
-                    # corresponding to their x in HETx
-                    for idx, (resname, hetx) in enumerate([(res.name, res.segid) for res in ligand_pm_obj.residues]):
-                        last_letter = hetx[-1:]
-                        ligand_pm_obj.residues[idx].name = resname + last_letter
-                    
-                    # Make the dataframe
-                    ligand_pm_obj_df = ligand_pm_obj.to_dataframe()                    
-                        
-                    
-                    #DEBUG
-                    #print(f"RESIDUE/SEGMENT NAMES: {[(res.name, res.segid) for res in ligand_pm_obj.residues]}")
-                    #print(f"The current HETs are: {', '.join(ligand_pm_obj_df.segid.unique())}")
-                    #print(f"The current resnames are: {', '.join(ligand_pm_obj_df.resname.unique())}")
-
-                    # Beginning support for multiple HETs 
-                    # which relies on that ligands in the same chain with different residue 
-                    # numbers have been given different x's in HETx by _add_segids()
-                    for idx, (segid, resname) in enumerate(zip(ligand_pm_obj_df.segid.unique(), ligand_pm_obj_df.resname.unique())):
-                        print(f"Processing {segid}")
-                        current_ligand_obj = ligand_pm_obj[ligand_pm_obj_df.segid == segid]
-
-                        # Optional ligand input (HET) sanitation
-                        if ((self.ligand_input_sanitation == True) and (self.rna==False)):
-                            # Save the ligand to disk, since the sanitation function works directly
-                            # on the file
-                            current_ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid.lower()}.pdb"
-                            current_ligand_obj.save(
-                                current_ligand_path, overwrite=True,
-                                )
-
-                            # Run the sanitizer, which will back up the incoming file to *.pdb.org and 
-                            # make a sanitized ligand with the same name as the input)
-                            self.sanitizeLigandInput(current_ligand_path)        
-
-                            # Reload the sanitized ligand
-                            sanitized_ligand_pm_obj = pm.load_file(
-                                current_ligand_path, structure=True
-                            )
-
-                            # Reinstall the segid and resname that was lost in the above
-                            # We are fairly sure this HET only consists of one residue, but just to be sure;
-                            for res in sanitized_ligand_pm_obj.residues:
-                                # Debug
-                                #print(f"Setting segid to {segid}")
-                                res.segid = segid
-                                # Debug
-                                #print(f"Setting resname to {resname}")
-                                res.name = resname
-
-                            # REINSTATE THE SANTITIZED LIGAND AS THE CENTRAL PARMED OBJECT
-                            self.pm_obj = sanitized_ligand_pm_obj
-                        else:
-                            self.pm_obj = current_ligand_obj
-                        
-                        # The following are common steps, regardless of ligand sanitation
-                        self._remove_lp()
-                        self._check_for_hydrogens() 
-                       
-                        # DEBUG
-                        # print(f"SEGIDS AND (NUMBERED?) HYDROGENS SHOULD BE PRESENT:\n"\
-                        #       f"{self.pm_obj.to_dataframe()}\n")
-                        
-                        # Concatenate the HET objects
-                        if idx == 0:
-                            processed_lig_objs = self.pm_obj
-                        else:
-                            processed_lig_objs = processed_lig_objs + self.pm_obj
-                    
-                    # Remake the ligand_pm_obj so it is complete and ready to be distributed
-                    ligand_pm_obj = processed_lig_objs
-                        
+                    ligand_pm_obj_df = ligand_pm_obj.to_dataframe()
                 except IndexError:
                     sys.exit(f"No HET segids were found (no ligand)")
+                    
+                if pm_obj_df.empty:
+                    sys.exit(f"ERROR: No ligand was found in the input")
+                else:
+                    print(f"The 'ligand' consists of segid/chain "\
+                          f"{', '.join(['/'.join([seg,ch]) for seg,ch in zip(ligand_pm_obj_df.segid.unique(), ligand_pm_obj_df.chain.unique())])}"
+                    )
+               
+                # Since rather often ligands in x-ray cocrystal structures carry the same
+                # residue names, we quite brutally rename the residues, giving them an appended letter
+                # corresponding to their x in HETx
+                for idx, (resname, hetx) in enumerate([(res.name, res.segid) for res in ligand_pm_obj.residues]):
+                    last_letter = hetx[-1:]
+                    new_resname = resname + last_letter
+                    ligand_pm_obj.residues[idx].name = new_resname
+                    print(f"Renamed {resname} from segid {hetx} to {new_resname}")
+                
+                # Update the dataframe
+                ligand_pm_obj_df = ligand_pm_obj.to_dataframe()                    
+                    
+                #DEBUG
+                #print(f"RESIDUE/SEGMENT NAMES: {[(res.name, res.segid) for res in ligand_pm_obj.residues]}")
+                #print(f"The current HETs are: {', '.join(ligand_pm_obj_df.segid.unique())}")
+                #print(f"The current resnames are: {', '.join(ligand_pm_obj_df.resname.unique())}")
+
+                # Beginning support for multiple HETs 
+                # which relies on that ligands in the same chain with different residue 
+                # numbers have been given different x's in HETx by _add_segids()
+                for idx, (segid, resname, resnum) in enumerate(
+                    zip(ligand_pm_obj_df.segid.unique(), 
+                        ligand_pm_obj_df.resname.unique(),
+                        ligand_pm_obj_df.resnum.unique(),
+                    )
+                ):
+                    print(f"Processing {resname} {resnum} from {segid}")
+                    
+                    # Store the current segid/ligand as its own object
+                    current_ligand_obj = ligand_pm_obj[ligand_pm_obj_df.segid == segid]
+
+                    # Optional ligand input (HET) sanitation
+                    if ((self.ligand_input_sanitation == True) and (self.rna==False)): # NOT SURE WHETHER THE RNA BIT IS CRUCIAL YET
+                        # Save the ligand to disk, since the sanitation function works directly
+                        # on the file
+                        current_ligand_path = f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.ligand_id}_{segid.lower()}.pdb"
+                        current_ligand_obj.save(
+                            current_ligand_path, overwrite=True,
+                            )
+
+                        # Run the sanitizer, which will back up the incoming file to *.pdb.org and 
+                        # make a sanitized ligand with the same name as the input)
+                        self.sanitizeLigandInput(current_ligand_path)        
+
+                        # Reload the sanitized ligand
+                        sanitized_ligand_pm_obj = pm.load_file(
+                            current_ligand_path, structure=True
+                        )
+
+                        # Reinstall the segid and resname that was lost in the above
+                        # We are fairly sure this HET only consists of one residue, but just to be sure;
+                        for res in sanitized_ligand_pm_obj.residues:
+                            # Debug
+                            #print(f"Setting segid to {segid}")
+                            res.segid = segid
+                            # Debug
+                            #print(f"Setting resname to {resname}")
+                            res.name = resname
+                            # Debug
+                            #print(f"Setting resnum to {resnum}")                            
+                            res.number = resnum
+
+                        # REINSTATE THE SANTITIZED LIGAND AS THE CENTRAL PARMED OBJECT
+                        self.pm_obj = sanitized_ligand_pm_obj
+                    else:
+                        self.pm_obj = current_ligand_obj
+                    
+                    #DEBUG
+                    print(f"DF AFTER LIGAND SANITATION:\n"\
+                          f"{self.pm_obj.to_dataframe()}\n")
+                    
+                    # The following are common steps, regardless of ligand sanitation
+                    self._remove_lp()
+                    self._check_for_hydrogens() 
+                    
+
+                    
+                    # Concatenate the HET objects
+                    if idx == 0:
+                        processed_lig_objs = self.pm_obj
+                    else:
+                        processed_lig_objs = processed_lig_objs + self.pm_obj
+                
+                # Remake the ligand_pm_obj so it is complete and ready to be distributed
+                ligand_pm_obj = processed_lig_objs
+                        
+
 
         # NOW WE POSSIBLY HAVE THREE PARMED OBJECTS TO COMBINE:
         # THE SEPARATE PROTEIN sep_apo_protein_pm_obj (anything not HET)
@@ -487,8 +532,13 @@ class Preparation:
                              f"If you only wanted a waterbox, please use the -nc switch.")
                 else:
                     self.ligand_pm_obj = ligand_pm_obj
+                    print(f"{self.env.upper()}: LIGAND DF BEFORE MERGE:\n"\
+                          f"{self.ligand_pm_obj.to_dataframe()}\n")
                     self.protein_pm_obj = apo_protein_pm_obj
                     self.pm_obj = self.protein_pm_obj + self.ligand_pm_obj
+                    #DEBUG
+                    print(f"{self.env.upper()}: DF AFTER MERGE:\n"\
+                            f"{self.pm_obj.to_dataframe()}\n")
 
             elif self.env == "rna_single_strand":
                 self.ligand_pm_obj = ligand_pm_obj
@@ -589,9 +639,14 @@ class Preparation:
         # Get the segids and dataframe
         pm_obj_df = self.pm_obj.to_dataframe()
         segids = pm_obj_df.segid.unique()
+        resnames = pm_obj_df.resname.unique()  
+        resnums = pm_obj_df.resnum.unique()      
                 
         # Print some information
-        print(f"Check segid {', '.join(segids)} for hydrogens")
+        print(f"Check {', '.join([' '.join([str(rna), str(rnu)]) for rna,rnu in zip(resnames,resnums)])} "\
+              f"from segid {', '.join(segids)} for hydrogens"
+              ) # In case there are more than one
+                # resname/resnum/segid, we will see it
 
         # Normal run for ligands, etc.
         # Exclude segments that do not need explicit hydrogens (that ICBuild/HBuild can handle)
@@ -718,6 +773,8 @@ class Preparation:
                     # Debug
                     #print(f"Setting resname to {self.resname}")
                     res.name = self.resname
+                    res.number = resnums[0] # Dirty (can remove after method has been secured for single ligands)
+                    
                 
                 print(
                     f"Added "\
@@ -725,8 +782,8 @@ class Preparation:
                     f" hydrogens to residue {res.name} for pH {self.system_ph:.1f}"
                 )
                 # DEBUG
-                # print(f"DF FROM HYDROGENATION:\n"\
-                #       f"{self.pm_obj.to_dataframe()}\n")
+                print(f"DF FROM HYDROGENATION:\n"\
+                      f"{self.pm_obj.to_dataframe()}\n")
                 
                 # DEBUG
                 # # Resave the ParmEd object to view how it was perceived
@@ -754,7 +811,10 @@ class Preparation:
 
     def _add_segids_rna(self, pm_obj_df):
 
-        chids = set(i.residue.chain for i in self.pm_obj)
+        #chids = set(i.residue.chain for i in self.pm_obj)
+        chids = pm_obj_df.chain.unique()
+
+        
         print(f"Found chain IDs: " + ", ".join(chids))
         for chain in chids:
             for res in self.pm_obj.view[
@@ -860,88 +920,130 @@ class Preparation:
             #print(f"IN ADD SEGIDS: INCOMING: {pm_obj_df.segid.unique()}")    
             chids_no_segids = pm_obj_df.where(pm_obj_df.segid == "").chain.unique()
             print(f"Entities from chain {' and '.join(chids_no_segids)} are missing segids\n"\
-                  f"Will add segids based on chain, residue name and number")
+                  f"Will add segids based on residue number and chain")
             
             # Make a list of ABCD... for use as x in HETx
+            # as well as a list in which to store the used "x"s
             het_letters = list(string.ascii_uppercase)
             used_het_letters = []
             
+
+            
             # TODO Make this loop handle multiple ligands in one chain
-            chids = set(i.residue.chain for i in self.pm_obj)
+            #chids = set(i.residue.chain for i in self.pm_obj) # Sets can be dangerous since they are unordered
+            chids = pm_obj_df.chain.unique()
+            
             # DEBUG
             #print(f"Found chain IDs: " + ", ".join(chids))
             
+            # FIRST PASS - FIND PROTEIN, SOLVENT AND CRYSTALLIZATION COMPONENTS
             for (
                 chain
             ) in chids:
                 # DEBUG
                 #print(f"Working on chain {chain}")
+
         
-                # Set a temporary previous residue number
-                prev_resnum = -1
+
 
                 # Loop over the residues in the current chain
                 for res in self.pm_obj.view[
                     pm_obj_df.chain == f"{chain}"
                 ].residues:  # produce a select view of this chain's residues using a boolean mask
-                    # DEBUG
-                    #print(f"Working on residue {res.name}")
-                    resnum = res.number
+                             # We use a structure view here, so that the underlying object will in
+                             # fact be changed, and remember the changes
+                    
+                    # Separate out residues that belong to segids PRO, WAT and XRD (crystallization buffer components)
                     if res.name in aa_res:
                         res.segid = f"PRO{chain}"
                     elif res.name in wat_res:
                         res.segid = f"WAT{chain}"
                     elif res.name in exclude_res:
                         res.segid = f"XRD{chain}"
+                        
+            # SECOND PASS - FIND HETs
+            # Update dataframe
+            pm_obj_df = self.pm_obj.to_dataframe()
+            
+            for (
+                chain
+            ) in chids:
+
+                # Debug                
+                # residues_in_this_chain = pm_obj_df.where((pm_obj_df.chain == chain) & (pm_obj_df.segid == "")).dropna().resnum.unique()
+                # print(f"RESIDUES IN {chain}: {residues_in_this_chain}")   
+                             
+                # Set a temporary previous residue number
+                prev_resnum = -1
+                
+                # Loop over the residues in the current chain
+                for res in self.pm_obj.view[
+                    (pm_obj_df.chain == chain) & (pm_obj_df.segid == "")
+                    #pm_obj_df.chain == f"{chain}"
+                ].residues:  # produce a select view of this chain's residues using a boolean mask
+                             # We use a structure view here, so that the underlying object will in
+                             # fact be changed, and remember the changes
+                    # Note the current residue number
+                    resnum = res.number
+                                                 
+                    # Remaining residues are candidates for the HET segid
+                    #else:
+                
+
+                    
+                    
+                    # There is no need to set the segid of a residue multiple times
+                    # so let's check to see if we are still on the same residue
+                    if resnum != prev_resnum:
+                        # We primarily want to give the likely candidates
+                        # for HETx an x letter that reflects, in order of priority:
+                        # - a lower residue number
+                        # The reason for this is that most PDBs are listed with the most important 
+                        # ligand first (the one in the binding pocket), while other ligands that 
+                        # appear in the crystal are given higher residue numbers
+                        # This also facilitates the use of a default "PROA+HETA" filter which 
+                        # makes the most common use cases easier to run
+                        this_het_letter = het_letters.pop(0)
+                        res.segid = f"HET{this_het_letter}"
+                        used_het_letters.append(this_het_letter)
+                        # Debug
+                        print(f"Assigned segid {res.segid} to {res.name} {res.number} from chain {res.chain}")                            
+                        
+                        
+                        # ALTERNATIVE VARIANT, THAT PRIORITIZES CHAIN ID
+                        # if chain not in used_het_letters:
+                        #     res.segid = f"HET{chain}"
+                        #     used_het_letters.append(str(chain))
+                        #     het_letters.remove(chain)
+                        #     # Debug
+                        #     print(f"Assigned segid {res.segid} to {res.name} {res.number} from chain {res.chain}")
+                        # else:
+                        #     # However, if this segid (HETx) is already used, we will 
+                        #     # pop a new "x" out of the letter list. We have made sure that
+                        #     # this list does not contain any letters that have been used
+                        #     # previously
+                        #     this_het_letter = het_letters.pop(0)
+                        #     res.segid = f"HET{this_het_letter}"
+                        #     used_het_letters.append(this_het_letter)
+                        #     # Debug
+                        #     print(f"Assigned segid {res.segid} to {res.name} {res.number} from chain {res.chain}")
                     else:
-                        if resnum == prev_resnum:
-                            pass
-                        else:
-                            # We primarily want to give the remaining entities 
-                            # (likely candidates for HETs) a name that is based
-                            # on their chain ID
-                            if chain not in used_het_letters:
-                                res.segid = f"HET{chain}"
-                                used_het_letters.append(str(chain))
-                                het_letters.remove(chain)
-                            else:
-                                # However, if this HET is already used, we will 
-                                # pop one out of the list. We have made sure that
-                                # this list does not contain any letters used above
-                                this_het_letter = het_letters.pop(0)
-                                res.segid = f"HET{this_het_letter}"
-                                used_het_letters.append(this_het_letter)
-                                
+                        pass      
+                     
+                    # Update the previous residue number                             
                     prev_resnum = resnum
             
             #print(f"Added segids. Current segids: {', '.join(set(self.pm_obj.to_dataframe().segid))}")
 
         #return self.pm_obj
         
-    def createCRDfiles(self, segids, pm_obj_df):
-        #pm_obj_df = self.pm_obj.to_dataframe()
-        
-        exclude_segids = [
-            "PROB",
-            "PROC",
-            "PROD",
-            "HETB",
-            "HETC",
-            "HETD",
-            "WATA",
-            "WATB",
-            "WATC",
-            "XRDA",
-            "XRDB",
-            "XRDC",
-            "XRDD",
-            "SOLV",
-            "IONS",
-        ]
-        
+    def createCRDfiles(self):
+        pm_obj_df = self.pm_obj.to_dataframe()
+        segids = pm_obj_df.segid.unique()
+        print(pm_obj_df)
         used_segids = []
         for segid in segids:
-            if segid not in exclude_segids:  # multiple ligands are excluded for now
+            if segid not in Preparation.segidfilter: # SHOULD BE UNNECESSARY AT THIS POINT - SHOULD RATHER CATER FOR MULTIPLE
                 # Store in the segids to be given to CharmmManipulation
                 used_segids.append(segid)
 
@@ -965,8 +1067,8 @@ class Preparation:
                         )
                         
                         #DEBUG
-                        # print(f"DF FOR CRD CREATION FOR {segid}:\n"\
-                        #       f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
+                        print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
+                              f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
                         
                         # Write the CHARMM CRD file from the ParmEd object
                         self.pm_obj[pm_obj_df.segid == segid].save(
@@ -986,11 +1088,13 @@ class Preparation:
                         # else:
                         #     # If the switch is not active, 
                         #     
-                        # save the CHARMM PDB file of the ligand from the ParmEd object
                         # DEBUG
                         # print(f"INSPECT LIGAND DF:\n"\
                         #       f"{self.pm_obj.to_dataframe()}\n")
-                        
+
+                        # Save a PDB file of the ligand from the ParmEd object
+                        # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
+                        # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
                         self.pm_obj[pm_obj_df.segid == segid].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
@@ -1025,13 +1129,23 @@ class Preparation:
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}"
                         )
                         
+                        #DEBUG
+                        # pm_obj_df = self.pm_obj.to_dataframe()
+                        # het_obj = self.pm_obj[pm_obj_df.segid == segid]
+                        # print(het_obj.to_dataframe())
+                        
+                        print(f"{self.env.upper()}: DF FOR CRD CREATION FOR {segid}:\n"\
+                              f"{pm_obj_df[pm_obj_df.segid == segid]}\n")
+                        
                         # Save the CHARMM CRD file of the ligand from the ParmEd object
-                        self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
+                        self.pm_obj[pm_obj_df.segid == segid].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{segid.lower()}.crd",
                             overwrite=True,
                         )
                         
-                        # Save the CHARMM PDB file of the ligand from the ParmEd object
+                        # Save a PDB file of the ligand from the ParmEd object
+                        # THIS IS THE PDB FILE THAT IS CONVERTED BY OPENBABEL TO A MOL2 FILE 
+                        # WHICH IS USED TO GENERATE PARAMETERS WITH CGENFF
                         self.pm_obj[pm_obj_df.segid == f"{segid}"].save(
                             f"{self.parent_dir}/{self.ligand_id}/{self.env}/{self.resname.lower()}/{self.resname.lower()}.pdb",
                             overwrite=True,
@@ -1135,7 +1249,7 @@ class Preparation:
         
         print(f"Converting ligand from {self.ligand_id} ({mol.OBMol.GetFormula()}) to MOL2 and SDF files\n"\
               f"The OBMol object consists of the following residues (chain/name/#atoms): "\
-              f"{', '.join(['/'.join([res.GetChain(), res.GetName(), str(res.GetNumAtoms())]) for res in openbabel.OBResidueIter(mol.OBMol)])}"
+              f"{', '.join(['/'.join([res.GetChain(), str(res.GetName()), str(res.GetNumAtoms())]) for res in openbabel.OBResidueIter(mol.OBMol)])}"
             )
                     
         assert (mol.OBMol.NumResidues()) == 1
@@ -1179,7 +1293,7 @@ class Preparation:
         
         print(f"Converting ligand from {self.ligand_id} ({mol.GetFormula()}) to MOL2 and SDF files\n"\
               f"The OBMol object consists of the following residues (chain/name/#atoms): "\
-              f"{', '.join(['/'.join([res.GetChain(), res.GetName(), str(res.GetNumAtoms())]) for res in openbabel.OBResidueIter(mol)])}"
+              f"{', '.join(['/'.join([res.GetChain(), str(res.GetName()), str(res.GetNumAtoms())]) for res in openbabel.OBResidueIter(mol)])}"
             )
                     
         assert (mol.NumResidues()) == 1
@@ -1528,7 +1642,7 @@ bomlev 0
             if step == "step1_pdbreader":
                 print(
                     f"\n"\
-                    f"TIPS:\n"\
+                    f"INFO on common errors:\n"\
                     f"If GENIC is saying it cannot find residue XYZ, please check that CGenFF actually\n"\
                     f"produced a stream file with meaningful content from the input MOL2 file\n"\
                     f"(which was converted with OpenBabel from the input PDB file).\n"\
