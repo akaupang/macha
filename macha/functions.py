@@ -18,6 +18,7 @@ import string
 import numpy as np
 from .charmm_factory import CharmmFactory
 import re
+import natsort
 
 import warnings
 
@@ -101,6 +102,25 @@ class Preparation:
         self.rna: bool = rna
         self.system_ph = system_ph        
         self.ligand_input_sanitation: bool = ligand_input_sanitation
+        
+        # FILTERS START        
+        self.segidfilter: list = [
+            "PROB",
+            "PROC",
+            "PROD",
+            "HETB",
+            "HETC",
+            "HETD",
+            "WATA",
+            "WATB",
+            "WATC",
+            "XRDA", # The XRDx segids are made by _add_segids()
+            "XRDB", # The XRDx segids are made by _add_segids()
+            "XRDC", # The XRDx segids are made by _add_segids()
+            "XRDD", # The XRDx segids are made by _add_segids()
+            "SOLV",
+            "IONS",
+        ]
         
         # Make folder structure for this environment
         self.makeTFFolderStructure()
@@ -462,9 +482,9 @@ class Preparation:
                 self.protein_pm_obj = None
                 self.pm_obj = self.ligand_pm_obj
             elif self.env == "complex":
-                if apo_protein_pm_obj == None: # THE INTERNAL NC SWITCH
-                    pass
-                    # TRIGGER
+                if apo_protein_pm_obj == None: # CURRENTLY THIS HALTS THE COMPLEX RUN
+                    sys.exit(f"No protein was found from which to make a complex.\n"\
+                             f"If you only wanted a waterbox, please use the -nc switch.")
                 else:
                     self.ligand_pm_obj = ligand_pm_obj
                     self.protein_pm_obj = apo_protein_pm_obj
@@ -815,11 +835,18 @@ class Preparation:
             "GLUP",
         ]  # we need to find the residue of the ligand which should be the only one being not an aa
 
+        wat_res = [
+            "HOH",
+            "TIP",
+            "SPC", # SPC waters?
+        ]
         exclude_res = [# TODO Many more common crystallization additives should be added to this list
-            "1PE", "BOG"
+            "1PE", 
+            "BOG"
         ]
 
-        # ions_res =[] # TODO A list of ions could be added for their particular handling
+        # ions_res =[# TODO A list of ions could be added for their particular handling 
+        #] 
 
         # RUDIMENTARY TEST FOR EXISTING SEGIDS
         # The length of the ParmEd object dataframe in which the
@@ -862,7 +889,7 @@ class Preparation:
                     resnum = res.number
                     if res.name in aa_res:
                         res.segid = f"PRO{chain}"
-                    elif ((res.name == "HOH") or (res.name.startswith("TIP"))):
+                    elif res.name in wat_res:
                         res.segid = f"WAT{chain}"
                     elif res.name in exclude_res:
                         res.segid = f"XRD{chain}"
@@ -1305,6 +1332,63 @@ class CharmmManipulation:
         os.remove(fout.name)
 
         pass
+
+    def _create_header(self, segids):
+
+        header = ""
+        for segi in natsort.natsorted(segids):
+            # RNA
+            if segi.startswith("RNA"):
+                header += f"""
+! Read {segi.upper()}
+open read card unit 10 name {segi.lower()}.crd
+read sequence coor card unit 10 resid
+generate {segi.upper()} setup warn first 5TER last 3TER
+
+open read unit 10 card name {segi.lower()}.crd
+read coor unit 10 card resid
+        """
+        
+            # PROTEIN
+            elif ((self.env != "waterbox") and (segi not in Preparation.segidfilter)):
+            # [
+            #     "PROB",
+            #     "PROC",
+            #     "HETA",
+            #     "HETB",
+            #     "HETC",
+            #     "WATA",
+            #     "WATB",
+            #     "WATC",
+            #     "IONS",
+            #     "SOLV",
+            # ]:
+                header += f"""
+! Read {segi.upper()}
+open read card unit 10 name {segi.lower()}.crd
+read sequence coor card unit 10 resid
+generate {segi.upper()} setup warn first NTER last CTER
+
+open read unit 10 card name {segi.lower()}.crd
+read coor unit 10 card resid
+        """
+            # HET SEGIDS
+            elif segi.startswith("HET"): # segi == "HETA": # REDO FOR GENERAL HET*
+                header += f"""
+bomlev -1  ! not ideal but necessary for taking three-membered rings into account
+! Read {segi.upper()}
+open read card unit 10 name {segi.lower()}.crd
+read sequence coor card unit 10 resid
+generate {segi.lower()} setup warn first none last none
+
+open read unit 10 card name {segi.lower()}.crd
+read coor unit 10 card resid
+bomlev 0
+        """
+            else:
+                pass
+
+        return header
     
     def modifyStep1(self, segids):
 
@@ -1343,7 +1427,9 @@ class CharmmManipulation:
                     # Create read/generate statements from segids
                     # NOTE WHY IS THIS NOT A FUNCTION IN THE CHARMMMANIPULATION CLASS, 
                     # BUT RATHER IN ITS OWN CLASS (CHARMMFACTORY)?
-                    header_block = CharmmFactory.createHeader(segids, self.env)
+                    #header_block = CharmmFactory.createHeader(segids, self.env)
+                    header_block = self._create_header(segids)
+
                     fout.write(f"{header_block}\n")                    
                     
                 if line.startswith("!Print heavy atoms with "): # Marks the end of the header section

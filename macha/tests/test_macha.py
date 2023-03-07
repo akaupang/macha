@@ -39,6 +39,10 @@ def test_createFolders():
     pdb_macha = preparation.pm_obj
     pdb_orig = pm.load_file("macha/data/original/cdk2_l32.pdb")
 
+|   # I think this test will fail since the pm_obj is a now a dynamical entity which changes size 
+    # quite a bit during the preparation run. The new statics are;
+    # preparation.ligand_pm_pbj and preparation.protein_pm_obj 
+ 
     # check if pdb file is read in correctly by parmed and compare a random atom to the original file
     number = randint(0, 9065)
     assert str(pdb_macha.atoms[number]) == str(pdb_orig.atoms[number])
