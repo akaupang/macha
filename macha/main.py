@@ -85,6 +85,7 @@ for ligand_id in ligand_ids:
         print(f"_________________________________________________________________________________ {env.upper():>8}")
         print(f"{str(' '):>90}")
 
+
         ########################################################################
         # Preparation of ligands
         # Instantiate class
@@ -96,19 +97,22 @@ for ligand_id in ligand_ids:
             cgenff_path=cgenff_path,
             protein_id=protein_id,
             rna=False,
-            direct_pdb_to_mol2=False, # there is use for this as OpenBabel fails (silently) to treat certain structures e.g. triazoles, and creates a different molecule
-            system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
-                            # be protonated by OpenBabel according to this pH
-            ligand_input_sanitation=True,
+            raw_pdb_to_mol2=False,          # There is use for this as OpenBabel fails (silently) to treat certain structures e.g. triazoles, and creates a different molecule
+            system_ph=7.4,                  # If a ligand is missing all hydrogens, it will be protonated by OpenBabel according to this pH
+            ligand_input_sanitation=True,   # if False, ligands will not be checked for hydrogens, repeated atom names/numbers and double-uppercase element names
+            relax_input_segid_filter=False, # if False, only PROA and HETA will be used
+            #include_xray_water=False,       # Whether to include x-ray water molecules
         )
         
         # Create CHARMM Coordinate files
         used_segids = preparation.createCRDfiles()
-        print(f"CRD Generation: Segids {', '.join(used_segids)} will be used"
-              )
+        print(
+            f"Input parsing finished. Segids {', '.join(used_segids)} will be used "\
+            f"for CRD generation and related tasks"
+        )
 
         ########################################################################
-
+        
         # Edit the CHARMM-GUI scripts
         # Instantiate class
         charmmManipulation = CharmmManipulation(
