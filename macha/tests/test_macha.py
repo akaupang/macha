@@ -5,8 +5,12 @@ import os
 import parmed as pm
 
 ligand_id = "cdk2_l32"
-parent_dir = "../data"
-original_dir = "original"
+# for github
+parent_dir = "."
+original_dir = "macha/data/original"
+# for local
+#parent_dir = "../data"
+#original_dir = "original"
 
 
 def test_import():
