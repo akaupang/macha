@@ -96,6 +96,7 @@ for ligand_id in ligand_ids:
             cgenff_path=cgenff_path,
             protein_id=protein_id,
             rna=False,
+            direct_pdb_to_mol2=False, # there is use for this as OpenBabel fails (silently) to treat certain structures e.g. triazoles, and creates a different molecule
             system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
                             # be protonated by OpenBabel according to this pH
             ligand_input_sanitation=True,
