@@ -93,6 +93,7 @@ for ligand_id in ligand_ids:
             original_dir=original_dir,
             ligand_id=ligand_id,
             env=env,
+            cgenff_path=cgenff_path,
             protein_id=protein_id,
             rna=False,
             system_ph=7.4,  # If a ligand is missing all hydrogens, it will 
@@ -100,17 +101,11 @@ for ligand_id in ligand_ids:
             ligand_input_sanitation=True,
         )
         
-        # Round up the segids to be used during this pass 
-        pm_obj_df = preparation.pm_obj.to_dataframe()
-        segids = pm_obj_df.segid.unique()
-
         # Create CHARMM Coordinate files
-        segids, used_segids = preparation.createCRDfiles(segids, pm_obj_df)
-        print(f"CRD Generation: Found segids {', '.join(segids)} and used segids {', '.join(used_segids)}"
+        used_segids = preparation.createCRDfiles()
+        print(f"CRD Generation: Segids {', '.join(used_segids)} will be used"
               )
 
-        # Get the toppar stream from a local CGenFF binary
-        preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
         ########################################################################
 
         # Edit the CHARMM-GUI scripts
