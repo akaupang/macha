@@ -1,30 +1,60 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 25 12:03:58 2022
+Updated in February 2023
 
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
 import argparse
 from functions import checkInput, Preparation, CharmmManipulation
+#import logging
 
 ################################################################################
 ### VARIABLES/SETTINGS
 ################################################################################
 
-parent_dir = "."
-original_dir = "data/original"
-input_ext = "pdb"  # exclusive support for PDB
-protein_name = "protein" # -> protein.pdb
-cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
+parent_dir = "data"
+original_dir = "original"
+input_ext = "pdb"         # exclusive support for PDB files for now
+protein_name = "protein"  # -> protein.pdb
+cgenff_path = ""          # MUST BE SET BY USER
+
+# ################################################################################
+# ### LOGGING
+# ################################################################################
+# # create logger
+# logger = logging.getLogger('macha')
+# logger.setLevel(logging.DEBUG)
+
+# # create console handler and set level to debug
+# ch = logging.StreamHandler()
+# ch.setLevel(logging.DEBUG)
+
+# # create formatter
+# #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# formatter = logging.Formatter(%(levelname)s:%(message)s')
+
+# # add formatter to ch
+# ch.setFormatter(formatter)
+
+# # add ch to logger
+# logger.addHandler(ch)
 
 ################################################################################
 # MAIN (WORK)
 ################################################################################
+# Introductions are in order
+print(f"{str(' '):>90}")
+print(f"======================================================================   m   a   c   h   a")
+print(f"{str(' '):>90}")
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
 # If protein.pdb is found, assume ligands alone.
-protein_id, ligand_ids = checkInput(parent_dir = parent_dir, original_dir = original_dir, protein_name = protein_name)
+protein_id, ligand_ids = checkInput(
+    parent_dir = parent_dir, 
+    original_dir = original_dir, 
+    protein_name = protein_name
+    )
 
 # ARGUMENT HANDLING
 # Initialize
@@ -45,37 +75,44 @@ else:
 
 # ITERATE THROUGH LIGANDS
 for ligand_id in ligand_ids:
-
-    print("\n")
-    print(f"Processing ligand {ligand_id}")
+    # Pretty printing
+    print(f"__________________________________________________________________________________________")
+    print(f"{str(' '):>90}")
+    print(f"Processing {ligand_id}")
 
     for env in envs:
+        # Announce the current environment
+        print(f"_________________________________________________________________________________ {env.upper():>8}")
+        print(f"{str(' '):>90}")
+
+
+        ########################################################################
         # Preparation of ligands
         # Instantiate class
         preparation = Preparation(
             parent_dir=parent_dir,
             original_dir=original_dir,
             ligand_id=ligand_id,
-            protein_id=protein_id,
             env=env,
+            cgenff_path=cgenff_path,
+            protein_id=protein_id,
+            rna=False,
+            raw_pdb_to_mol2=False,          # There is use for this as OpenBabel fails (silently) to treat certain structures e.g. triazoles, and creates a different molecule
+            system_ph=7.4,                  # If a ligand is missing all hydrogens, it will be protonated by OpenBabel according to this pH
+            ligand_input_sanitation=True,   # if False, ligands will not be checked for hydrogens, repeated atom names/numbers and double-uppercase element names
+            relax_input_segid_filter=False, # if False, only PROA and HETA will be used
+            #include_xray_water=False,       # Whether to include x-ray water molecules
+        )
+        
+        # Create CHARMM Coordinate files
+        used_segids = preparation.createCRDfiles()
+        print(
+            f"Input parsing finished. Segids {', '.join(used_segids)} will be used "\
+            f"for CRD generation and related tasks"
         )
 
-        # Check input types
-        segids, df = preparation.checkInputType()
-
-        # Make a Transformato style folder structure
-        preparation.makeTFFolderStructure()
-
-        # Create CHARMM Coordinate files
-        segids, used_segids = preparation.createCRDfiles(segids, df)
-        print("The following segment IDs were found/assigned:")
-        print(*segids)
-        print("The following segment IDs were used/not excluded:")
-        print(*used_segids)
-
-        # Get the toppar stream from a local CGenFF binary
-        preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
-
+        ########################################################################
+        
         # Edit the CHARMM-GUI scripts
         # Instantiate class
         charmmManipulation = CharmmManipulation(
@@ -94,6 +131,16 @@ for ligand_id in ligand_ids:
 
         # Run Charmm giving the correct executable path
         charmmManipulation.executeCHARMM(charmm_exe="charmm")
+        
+        # Convert the CHARMM system to an OpenMM system
         charmmManipulation.createOpenMMSystem()
+        
+        # Apply HMR to the OpenMM system
         charmmManipulation.applyHMR()
-        charmmManipulation.createTFYamlFile(dt=0.002)
+        
+        # Create YAML file for ASFE simulations using TF (requires ./parent/config directory)
+        charmmManipulation.createTFYamlFile(dt=0.002, nstep=2500000)
+        
+        # Space to pause and consider
+        print(f"{str(' '):>90}")
+        

@@ -59,8 +59,9 @@ cgenff_exec () {
 # Transformato submenu
 run_t_submenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Transformato Options"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " 1 : Run Transformato system creation (Python 3.9)"
   echo " 2 : "
@@ -130,8 +131,9 @@ run_t_submenu () {
 # Advanced submenu
 run_a_submenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Advanced Options"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key  Pre-run options"
   echo " 1 : Add ligand toppar to toppar.str"
   echo " 2 : Create ligand toppar folders and parameters with local CGenFF"
@@ -312,8 +314,9 @@ run_a_submenu () {
 # Main menu
 runmenu () {
   echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Manual Launch Control for CHARMM-GUI Scripts"
-  echo ""
+  echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " a : Advanced pre-/post-run options"
   echo " t : Transformato options"
@@ -340,27 +343,33 @@ runmenu () {
 
   if [ "$menuoption" = "1" ]; then
     echo ""
+    echo ""
     charmm_exec < step1_pdbreader.inp > step1_pdbreader.out && tail -n 6 step1_pdbreader.out
     sed -n '/START_PAR/,/END_PAR/p' step1_pdbreader.out > step1_used_parameters.dat
     sed -n '/START_HBUILD/,/END_HBUILD/p' step1_pdbreader.out > step1_hbuild_log.dat
     runmenu
   elif [ "$menuoption" = "2" ]; then
     echo ""
+    echo ""
     charmm_exec < step2.1_waterbox.inp > step2.1_waterbox.out && tail -n 6 step2.1_waterbox.out && runmenu
 
   elif [ "$menuoption" = "3" ]; then
+    echo ""
     echo ""
     charmm_exec < step2.2_ions.inp > step2.2_ions.out && tail -n 6 step2.2_ions.out && runmenu
 
   elif [ "$menuoption" = "4" ]; then
     echo ""
+    echo ""
     charmm_exec < step2_solvator.inp > step2_solvator.out && tail -n 6 step2_solvator.out && runmenu
 
   elif [ "$menuoption" = "5" ]; then
     echo ""
+    echo ""
     charmm_exec < step3_pbcsetup.inp > step3_pbcsetup.out && tail -n 6 step3_pbcsetup.out && runmenu
 
   elif [ "$menuoption" = "c" ]; then
+    echo ""
     echo ""
     echo "Step 1 PDB Reader:"
     charmm_exec < step1_pdbreader.inp > step1_pdbreader.out &&\
@@ -598,6 +607,7 @@ runmenu () {
 
   elif [ "$menuoption" = "7" ]; then
     echo ""
+    echo ""
 
     # CHARMM-GUI CHARMM Interpreter Scripts for OpenMM
     omm_run="openmm_run.py"
@@ -663,6 +673,7 @@ runmenu () {
 ###############################################################################
 
   elif [ "$menuoption" = "8" ]; then
+    echo ""
     echo ""
 
     # Simple SLURM Script based on CG OpenMM scripts
