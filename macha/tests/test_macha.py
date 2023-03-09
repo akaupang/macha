@@ -1,16 +1,19 @@
 from random import randint
 import pytest
-from macha.functions import Preparation, checkInput, CharmmManipulation
+from macha.functions import Preparation, checkInput
+from macha.charmm_factory import CharmmManipulation
 import os
 import parmed as pm
 
-ligand_id = "cdk2_l32"
-# for github
-parent_dir = "."
-original_dir = "macha/data/original"
-# for local
-#parent_dir = "../data"
-#original_dir = "original"
+# Folders for GitHub tests
+# parent_dir = "."
+# original_dir = "macha/data/original"
+parent_dir = "macha/data"
+original_dir = "original"
+
+# Folders for local tests
+# parent_dir = "../data"
+# original_dir = "original"
 
 
 def test_import():
@@ -31,6 +34,7 @@ def test_checkInput():
 
 
 def test_createFolders():
+    ligand_id = "cdk2_l32"
 
     preparation = Preparation(
         parent_dir=parent_dir,
@@ -59,35 +63,58 @@ def test_createFolders():
 def test_run_macha_for_rna():
 
     ligand_id = "ino5"
-    parent_dir = "macha/data"
-    original_dir = "original"
-    input_ext = "pdb"  # for testing - should be pdb
-    cgenff_path = "/site/raid2/johannes/programs/silcsbio/silcsbio.2022.1/cgenff/cgenff"
+    protein_id = None
+    #parent_dir = "macha/data"
+    #original_dir = "original"
+    input_ext = "pdb"  # PDB is exclusively supported
+    cgenff_path = "" # Not needed for RNA
 
-    for env in ["single_strand", "double_strand"]:
+    for env in ["waterbox", "complex"]:
+        # preparation = Preparation(
+        #     parent_dir=parent_dir,
+        #     ligand_id=ligand_id,
+        #     original_dir=original_dir,
+        #     env=env,
+        #     cgenff_path=cgenff_path,
+        #     rna=True,
+        # )
         preparation = Preparation(
             parent_dir=parent_dir,
-            ligand_id=ligand_id,
             original_dir=original_dir,
+            ligand_id=ligand_id,
             env=env,
+            cgenff_path=cgenff_path,
+            protein_id=protein_id,
             rna=True,
+            raw_pdb_to_mol2=False,          # There is use for this as OpenBabel fails (silently) to treat certain structures e.g. triazoles, and creates a different molecule
+            system_ph=7.4,                  # If a ligand is missing all hydrogens, it will be protonated by OpenBabel according to this pH
+            ligand_input_sanitation=True,   # if False, ligands will not be checked for hydrogens, repeated atom names/numbers and double-uppercase element names
+            relax_input_segid_filter=False,  # if False, only PROA and HETA will be used
+            #include_xray_water=False,        # Whether to include x-ray water molecules
         )
-        segids, df = preparation.checkInputType()
-        print(segids)
-        # # Make a Transformato style folder structure below a folder bearing
-        # # the name of the ligand
-        preparation.makeTFFolderStructure()
-        segids, used_segids = preparation.createCRDfiles(segids, df)
 
-        print(segids, used_segids)
-        # # # # Get the toppar stream from a local CGenFF binary
-        # preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
+        # Create CHARMM Coordinate files
+        used_segids = preparation.createCRDfiles()
+        print(
+            f"Input parsing finished. Segids {', '.join(used_segids)} will be used "\
+            f"for CRD generation and related tasks"
+        )
+        # segids, df = preparation.checkInputType()
+        # print(segids)
+        # # # Make a Transformato style folder structure below a folder bearing
+        # # # the name of the ligand
+        # preparation.makeTFFolderStructure()
+        # segids, used_segids = preparation.createCRDfiles(segids, df)
+
+        # print(segids, used_segids)
+        # # # # # Get the toppar stream from a local CGenFF binary
+        # # preparation.getTopparFromLocalCGenFF(cgenff_path=cgenff_path)
 
         charmmManipulation = CharmmManipulation(
             parent_dir=parent_dir,
             ligand_id=ligand_id,
             original_dir=original_dir,
-            resname=preparation.resname,
+            het_resnames=preparation.het_resnames,
             env=env,
             ion_name="SOD",
             ion_conc=1.0,
