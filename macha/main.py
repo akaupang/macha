@@ -6,8 +6,8 @@ Updated in February 2023
 @author: Johannes Karwounopoulos and Åsmund Kaupang
 """
 import argparse
-from functions import checkInput, Preparation, CharmmManipulation
-#import logging
+from macha.functions import checkInput, Preparation
+from macha.charmm_factory import CharmmManipulation
 
 ################################################################################
 ### VARIABLES/SETTINGS
@@ -18,27 +18,6 @@ original_dir = "original"
 input_ext = "pdb"         # exclusive support for PDB files for now
 protein_name = "protein"  # -> protein.pdb
 cgenff_path = ""          # MUST BE SET BY USER
-
-# ################################################################################
-# ### LOGGING
-# ################################################################################
-# # create logger
-# logger = logging.getLogger('macha')
-# logger.setLevel(logging.DEBUG)
-
-# # create console handler and set level to debug
-# ch = logging.StreamHandler()
-# ch.setLevel(logging.DEBUG)
-
-# # create formatter
-# #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# formatter = logging.Formatter(%(levelname)s:%(message)s')
-
-# # add formatter to ch
-# ch.setFormatter(formatter)
-
-# # add ch to logger
-# logger.addHandler(ch)
 
 ################################################################################
 # MAIN (WORK)
@@ -119,7 +98,7 @@ for ligand_id in ligand_ids:
             parent_dir=parent_dir,
             ligand_id=ligand_id,
             original_dir=original_dir,
-            resname=preparation.resname,
+            het_resnames=preparation.het_resnames,
             env=env,
         )
         
