@@ -10,13 +10,13 @@ macha is meta-tool designed to (semi-)automate certain tasks related to setting 
 
 #### Installation
 
-macha can be obtained by cloning this repository, issuing: 
+macha can be obtained by cloning this repository, issuing:\ 
 `git clone git@github.com:akaupang/macha.git`
 
-macha is also available as a conda package and can be installed in any conda environment with:
+macha is also available as a conda package and can be installed in any conda environment with:\
 `conda install -c johanneskarwou -c conda-forge macha`
 
-### Post-installation setup
+##### Post-installation setup
 After installation, the user must set the path to `cgenff` in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
 
 For the CLI interface to work, a few variables should be set at the top of `manual_charmm_system_setup.sh`. The `macha_py_base` *must* be set to point to the base directory of the python backend for this to be usable. A user can also choose to set the `charmm_bin_man` if a particular CHARMM binary should be used (by default, `charmm` is assumed to be in the $PATH). 
