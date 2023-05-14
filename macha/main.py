@@ -15,11 +15,14 @@ import logging
 ### VARIABLES/SETTINGS
 ################################################################################
 
-parent_dir = "data"
-original_dir = "original"
-input_ext = "pdb"         # exclusive support for PDB files for now
-protein_name = "protein"  # -> protein.pdb
-cgenff_path = ""          # MUST BE SET BY USER
+# Setting a path to the local cgenff binary is mandatory for all other inputs 
+# than RNA and protein!
+cgenff_path = ""
+
+parent_dir = "data"       # The base output directory for the created systems
+original_dir = "original" # The directory for the original source data
+input_ext = "pdb"         # PDB files are exclusively supported for now
+protein_name = "protein"  # i.e. the program will look for "protein.pdb"
 
 ################################################################################
 ### LOGGING
@@ -47,7 +50,7 @@ console.setFormatter(formatter)
 # add the handler to the root logger
 logging.getLogger().addHandler(console)
 
-# # But we prefer module-specific logging
+# # But we might prefer module-specific logging
 # preplog = logging.getLogger('Preparation')
 # cmanlog = logging.getLogger('charmmFactory')
 
@@ -71,21 +74,16 @@ args = parser.parse_args()
 
 # Determine which environments/run types will be used
 if args.nocomplex == True:
-    #no_complex = True
     envs = ["waterbox"]
     logging.info("Attention: Only water boxes will be produced!")
     logging.info("")
 elif args.nowaterbox == True:
-    #no_waterbox = True
     envs = ["complex"]
     logging.info("Attention: Only complexes will be produced!")
     logging.info("")
 else:
-    #no_complex = False
     envs = ["waterbox", "complex"]
-
-   
-rna = False 
+    
 if args.rna == True:
     rna = True
     logging.info("Attention: Input type set to RNA. Other input types will produce errors!")
@@ -93,13 +91,12 @@ if args.rna == True:
 else:
     rna = False
     
-# Check for CGenFF (except for RNA?)
+# Check for CGenFF (except for RNA)
 if ((cgenff_path == "") and (rna == False)):
-    logging.critical(   f"\tThis package requires cgenff for parameterization.\n"\
-                        f"\tPlease install it in the active environment or point the routine\n"\
-                        f"\tto the right path using the key cgenff_path='/path/to/cgenff' .\n"\
-                        f"\t"
-                    )
+    logging.error(f"This package requires cgenff for parameterization.")
+    logging.error(f"Please install it in the active environment or point the routine")
+    logging.error(f"to the right path using the key cgenff_path='/path/to/cgenff' .")
+    logging.error(f"")  
     sys.exit(1)
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
@@ -160,10 +157,8 @@ for ligand_id in ligand_ids:
         
         # Create CHARMM Coordinate files
         used_segids = preparation.createCRDfiles()
-        logging.info(
-            f"Input parsing finished. Segids {', '.join(used_segids)} will be used "\
-            f"for CRD generation and related tasks"
-        )
+        logging.info(f"Input parsing finished. Segids {', '.join(used_segids)} will be used "\
+                     f"for CRD generation and related tasks")
 
         ########################################################################
         

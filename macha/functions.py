@@ -550,8 +550,8 @@ class Preparation:
                         else:
                             # Quick check for hydrogens if sanitation is not requested
                             if len([atm for atm in current_ligand_obj.atoms if atm.element_name == 'H']) == 0:
-                                logging.warning(f"WARNING: No hydrogens were found in ligand and ligand sanitation was not requested")
-                                logging.warning(f"WARNING: CHARMM run may fail!")
+                                logging.warning(f"No hydrogens were found in ligand and ligand sanitation was not requested")
+                                logging.warning(f"CHARMM run may fail!")
                             self.pm_obj = current_ligand_obj
                         
                         #DEBUG
@@ -724,7 +724,7 @@ class Preparation:
         if ion_convert == True:
             logging.info(f"One or more ionized amino acid residue names were converted to CHARMM format")
         if his_convert == True:
-            logging.warning(f"WARNING: One or more HIS residues were renamed to HSD")
+            logging.warning(f"One or more HIS residues were renamed to HSD")
                 
     
     def _check_for_hydrogens(self):

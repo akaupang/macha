@@ -18,6 +18,8 @@ macha is also available as a conda package and can be installed in any conda env
 
 `conda install -c johanneskarwou -c conda-forge macha`
 
+<!-- TODO: Update the conda package. Add packages parmed, openbabel, natsort to conda package requirements. -->
+
 ##### Post-installation setup
 After installation, the user must set the path to `cgenff` in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
 
@@ -42,4 +44,17 @@ always be up to date. Please inspect and/or use/modify the python scripts direct
 encounter any problems.
 
 #### Usage:
+
+The main task of the CLI frontend is to enable quick access to rerunning a particular step of the CHARMM-GUI-derived CHARMM input scripts, or all of them consecutively. The CLI also gives access to the main run types of the Python backend. The menus function by single-key selections and their operation should be fairly self-explanatory to anyone familiar with the CHARMM-GUI scripts and the function of each step.
+
+##### System creation for transformato
+The submenu "System creation for transformato" is accessed by clicking "t". Here, four run types are exposed; normal run (for proteins and ligands), RNA run, a run with exclusive generation of water boxes (no complexes) and a run with exclusive generation of complexes.
+
+macha should be called in a working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing main.py.
+
+Before running system creation, the `main.py` script must be copied to the working directory. This is done by choosing menu option "1" in the system creation for transformato submenu. This will also copy the path to the local cgenff binary to the python script, if it has been set at the top of the bash script `manual_charmm_system_setup.sh`, AND if the `cgenff_path` in `main.py` has not been set in the package version of this file `../macha/macha/main.py`.
+
+One may then select the run type of choice by clicking "2", "3", "4" or "5".
+
+Note that mixed batches of input files are not supported - a default run (for proteins and/or ligands) will fail to process input files with RNA as the ligand/guest, and vice versa; small-molecules will not be handled correctly by an RNA run. 
 

@@ -3,11 +3,15 @@
 ###############################################################################
 
 # SYSTEM VARIABLES
-# Macha python backend base
-macha_py_base="/path/to/macha/macha" # Path to python backend
+# Macha python backend base folder # /path/to/macha/macha
+macha_py_base="/home/manny/Documents/Work/UiO/Modeling/wien/scripts/bash/macha/macha"
+
+# cgenff binary location
+cgenff_bin="/home/manny/Documents/Work/UiO/Modeling/wien/ligands/silcsbio/silcsbio.2022.1/cgenff/cgenff"
+#cgenff_bin=""
 
 # Charmm binary # Leave empty if the system-wide charmm is to be used
-charmm_bin_man="" # or "/path/to/charmm/bin/charmm" # if you want to use a particular charmm binary
+charmm_bin_man="/home/manny/charmm/bin/charmm"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
 # Default is the directory created upon creation of a modified OpenMM system,
@@ -20,8 +24,7 @@ ommcname="step3.1_omm"
 # The name of the internally generated HMR application Python script (which uses ParmEd) is
 ahmrf_py="apply_HMR_with_ParmEd.py"
 
-###############################################################################
-    
+###############################################################################    
 ###############################################################################
 
 # If no manual charmm binary location is given
@@ -41,10 +44,6 @@ else
   charmm_bin=${charmm_bin_man}
 fi
 
-
-# TRANSFORMATO_RELATED
-# ALL FUNCTIONS IN PYTHON BACKEND
-
 # Functions
 # Execute CHARMM
 charmm_exec () {
@@ -56,15 +55,25 @@ cgenff_exec () {
   ${cgenff_bin} "$@"
 }
 
-# Transformato submenu
+# SED replacement escaper
+function sedPath () {
+  local input=$1  
+  local output=$(echo ${input}|sed -r 's/([\$\.\*\/\[\\^])/\\\1/g'|sed 's/[]]/\[]]/g') 
+  echo "${output}"
+  } #Escape path for use with sed
+
+# System creation submenu for transformato
 run_t_submenu () {
   echo ""
   echo "--------------------------------------------------------------------------------"
-  echo "Transformato Options"
+  echo "System creation for transformato (Python 3.9)"
   echo "--------------------------------------------------------------------------------"
   echo "Key"
-  echo " 1 : Run Transformato system creation (Python 3.9)"
-  echo " 2 : "
+  echo " 1 : Copy main.py from package and set path to cgenff"
+  echo " 2 : Run system creation - proteins and ligands"
+  echo " 3 : Run system creation - RNA"
+  echo " 4 : Run system creation - only water boxes"
+  echo " 5 : Run system creation - only complexes"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -74,7 +83,7 @@ run_t_submenu () {
 
   if [ "$submenuoption" = "1" ]; then
     echo ""
-    echo "Please provide the base path for transformato"
+    echo "Please provide the base path for system creation"
     call_path=$PWD
     echo "Press Enter to use the current directory:"
     echo ${call_path}
@@ -98,20 +107,66 @@ run_t_submenu () {
     fi  
 
     # Prepare for python backend run  
-    # Copy main.py from default location
+    # Copy main.py from default location to current working folder
     cp $macha_py_base/main.py ./
 
-    # Edit import statement
-    sed -i "s/from functions import/from macha.functions import/g" main.py
+    # Get the line where the cgenff path is defined in the Python backend
+    cgenff_py_bin=$(head -n 50 main.py | grep "cgenff_path" | grep -o '.*=.*"[[:space:]]*"')
 
+    # Check if the cgenff path is defined either in CLI or in the Python backend
+    if [ "$cgenff_py_bin" = 'cgenff_path = ""' ]; then
+      # Edit the cgenff location if one is given here, and none exists in the copied main.py
+      if [ "$cgenff_bin" == "" ]; then
+        echo "A path to the cgenff binary has not been set in the CLI nor in the Python backend. Set in either in the CLI or in main.py (in this folder)."
+        run_t_submenu 
+      else
+        # Create the source and destination (replacement) strings
+        SRC="cgenff_path.*=.*\"[^\"]*\"" 
+        DST=$(sedPath "${cgenff_bin}")
+        # Make the replacement
+        sed -i "0,/cgenff_path/{s/${SRC}/cgenff_path = \"${DST}\"/}" main.py && echo "Inserted the path to cgenff, given by CLI, into the Python backend"
+        # Check that the replacement was done correctly
+        result=$(head -n 50 main.py | grep "cgenff_path")
+        echo "New cgenff path definition in backend:"
+        echo "${result}"
+        run_t_submenu
+      fi
+    else
+        echo "A path to the cgenff binary was set in the Python backend. Using this."
+        run_t_submenu
+    fi
+
+  elif [ "$submenuoption" = "2" ]; then
+    echo ""
     # Run backend
     python3 main.py
     
-    # Return to Transformato submenu
+    # Return to systems creation submenu
+    run_t_submenu
+  
+  elif [ "$submenuoption" = "3" ]; then
+    echo ""
+    # Run backend
+    python3 main.py -rna
+    
+    # Return to systems creation submenu
     run_t_submenu
 
-  #elif [ "$submenuoption" = "2" ]; then
-  #  run_t_submenu
+  elif [ "$submenuoption" = "4" ]; then
+    echo ""
+    # Run backend
+    python3 main.py -nc
+    
+    # Return to systems creation submenu
+    run_t_submenu
+
+  elif [ "$submenuoption" = "5" ]; then
+    echo ""
+    # Run backend
+    python3 main.py -nw
+    
+    # Return to systems creation submenu
+    run_t_submenu
 
   elif [ "$submenuoption" = "r" ];then
     runmenu
@@ -126,7 +181,6 @@ run_t_submenu () {
     run_t_submenu
   fi
 }
-
 
 # Advanced submenu
 run_a_submenu () {
@@ -197,7 +251,6 @@ run_a_submenu () {
     done
     cd call_path
     run_a_submenu
-
 
   elif [ "$submenuoption" = "4" ];then
     ahmrf_str='import os                                                                   \n'
@@ -319,7 +372,7 @@ runmenu () {
   echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " a : Advanced pre-/post-run options"
-  echo " t : Transformato options"
+  echo " t : System creation for transformato"
   echo ""
   echo " 1 : Step 1   PDB Reader (modified)"
   echo " 2 : Step 2.1 Waterbox"
@@ -857,6 +910,7 @@ runmenu () {
   elif [ "$menuoption" = "t" ]; then
     run_t_submenu
 
+###############################################################################
 ###############################################################################
   elif [ "$menuoption" = "q" ];then
     echo " <- Goodbye"
