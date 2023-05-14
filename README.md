@@ -10,10 +10,12 @@ macha is meta-tool designed to (semi-)automate certain tasks related to setting 
 
 #### Installation
 
-macha can be obtained by cloning this repository, issuing:\ 
+macha can be obtained by cloning this repository, issuing: 
+
 `git clone git@github.com:akaupang/macha.git`
 
-macha is also available as a conda package and can be installed in any conda environment with:\
+macha is also available as a conda package and can be installed in any conda environment with:
+
 `conda install -c johanneskarwou -c conda-forge macha`
 
 ##### Post-installation setup
