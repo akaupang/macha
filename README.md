@@ -6,7 +6,7 @@
 ## maNUAL chaRMM (macha)
 
 #### Description
-macha is meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend.
+macha is meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend. Typical use cases include rerunning CHARMM-GUI scripts locally (after edits or changes) and setting up water boxes and complexes (e.g. for further setup of free energy calculations with [transformato](https://github.com/wiederm/transformato)), starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/).
 
 #### Installation
 
