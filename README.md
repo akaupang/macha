@@ -57,7 +57,7 @@ The submenu "System creation for transformato" is accessed by clicking "t". Here
 - Make water boxes/complexes from double-stranded RNA (`python3 main.py --rna`)
 - Make water boxes (no complexes) from double- or single-stranded RNA (`python3 main.py --rna --nocomplex`)
 
-Before running system creation, the `main.py` script must be copied to the working directory. This is done by choosing menu option "1" in the system creation for transformato submenu. This will also copy the path to the local cgenff binary to this local copy of `main.py`, if the variable `cgenff_bin` has been set at the top of the bash script `manual_charmm_system_setup.sh`, AND if the `cgenff_path` in `main.py` has not been set in the package version of this file `../macha/macha/main.py`.
+Before running system creation, the `main.py` script must be copied to the working directory. This is done by choosing menu option "1" in the system creation for transformato submenu (*note that this overwrites any existing local copy*). This will also copy the path to the local cgenff binary to this local copy of `main.py`, if the variable `cgenff_bin` has been set at the top of the bash script `manual_charmm_system_setup.sh`, AND if the `cgenff_path` in `main.py` has not been set in the package version of this file `../macha/macha/main.py`.
 
 One may then select the run type of choice by clicking a number from 2 - 6 (if using the CLI).
 
