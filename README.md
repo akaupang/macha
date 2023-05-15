@@ -25,7 +25,7 @@ macha is also available as a conda package and can be installed in any conda env
 ##### Post-installation setup
 After installation, the user must set the path to a local `cgenff` binary in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
 
-For the CLI to work, a few variables should be set at the top of `manual_charmm_system_setup.sh`. The `macha_py_base` *must* point to the base directory of the python backend for this to be usable. If not set in the package version of `main.py`, the path to `cgenff` can be set here. A user can also choose to set the `charmm_bin_man` if a particular CHARMM binary should be used (by default, `charmm` is assumed to be in the $PATH). 
+For the CLI to work, a few variables should be set at the top of `manual_charmm_system_setup.sh`. The `macha_py_base` *must* point to the base directory of the python backend for this to be usable. If not set in the package version of `main.py`, the path to `cgenff` can be set here using the variable `cgenff_bin`. A user can also choose to set the variable `charmm_bin_man`, if a particular CHARMM binary should be used (by default, `charmm` is assumed to be in the $PATH). 
 
 For convenient usage of the CLI frontend, we recommend setting an alias in your `~/.bashrc` to `macha`, like so:
 
