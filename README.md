@@ -61,5 +61,5 @@ Before running system creation, the `main.py` script must be copied to the worki
 
 One may then select the run type of choice by clicking a number from 2 - 6 (if using the CLI).
 
-Note that mixed batches of input files are *not supported*, e.g. a typical run (for ligands/proteins/complexes) will fail to process input files with RNA as the ligand/guest, and vice versa; small-molecules will not be handled correctly by an RNA run. 
+**Note** that mixed batches of input files are *not supported*, e.g. a typical run (for ligands/proteins/complexes) will fail to process input files with RNA as the ligand/guest, and vice versa; small-molecules will not be handled correctly by an RNA run. 
 
