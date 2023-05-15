@@ -12,14 +12,8 @@ import glob
 import shutil
 import subprocess
 import parmed as pm
-#from openbabel import openbabel
-#from openbabel import pybel
-#import string
-#import numpy as np
-#from .charmm_factory import CharmmFactory # SEPARATE PREPARATION AND CHARMMANIPULATION CLASSES AS SEPARATE FILES
-#import re
 import natsort
-
+import logging
 import warnings
 
 # Supress ParmEd warnings
@@ -92,7 +86,7 @@ class CharmmManipulation:
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/toppar",
             )
         except:
-            print(f"A CHARMM toppar directory is already available")
+            logging.info(f"A CHARMM toppar directory is already available")
     
     def _modifyIonsCountFile(self):
 
@@ -176,7 +170,7 @@ bomlev 0
         try:
             self._appendLigandTopparToTopparStream()
         except TypeError:
-            print("Won't add a ligand stream file - assuming that the ligand is an RNA strand")
+            logging.info("Won't add a ligand stream file - assuming that the ligand is an RNA strand")
 
         # Open a a target for the new input file
         fout = open(
@@ -299,11 +293,11 @@ bomlev 0
         
         # A basic evaluation of the subprocess output codes
         if output.returncode:
-            print(
+            logging.info(
                 f"Something went wrong, please check the outputfile in {self.parent_dir}/{self.ligand_id}/{self.env}/{step}.out"
             )
             if step == "step1_pdbreader":
-                print(
+                logging.info(
                     f"\n"\
                     f"INFO on common errors:\n"\
                     f"If GENIC is saying it cannot find residue XYZ, please check that CGenFF actually\n"\
@@ -316,11 +310,11 @@ bomlev 0
             
             sys.exit("Processing terminated")
         else:
-            print(f"CHARMM process finished for {step}")
+            logging.info(f"CHARMM process finished for {step}")
             
             
     def createOpenMMSystem(self):
-        print("Creating a stand-alone OpenMM system")
+        logging.info("Creating a stand-alone OpenMM system")
 
         # Copy files for OpenMM
         # OpenMM Python scripts
@@ -346,7 +340,7 @@ bomlev 0
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/toppar",
             )
         except:
-            print(f"Toppar directory is already available in the OpenMM directory")
+            logging.info(f"Toppar directory is already available in the OpenMM directory")
 
         # Convert CHARMM toppar.str to OpenMM toppar.str
         self._convertCharmmTopparStreamToOpenmm(
@@ -368,7 +362,7 @@ bomlev 0
                         f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/{ext_top}",
                     )
                 except FileNotFoundError:
-                    print(
+                    logging.info(
                         f"ERROR: External topology/parameter folder {ext_top} not found!"
                     )
                     
@@ -376,7 +370,7 @@ bomlev 0
                 # though that could be a useful behaviour. Consider adding
                 # shutil.copytree(from, to, dirs_exist_ok=True) which works since Python 3.8
                 except FileExistsError:
-                    print(
+                    logging.info(
                         f"The topology/parameters folder {ext_top} is already present."
                     )
 
@@ -452,14 +446,14 @@ bomlev 0
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input.psf",
                 f"{self.parent_dir}/{self.ligand_id}/{self.env}/openmm/step3_input_orig.psf",
             )
-            print("Backed up OpenMM PSF file")
+            logging.info("Backed up OpenMM PSF file")
 
             input_psf = "step3_input.psf"
 
         # A backup of the orginal system exists (input_orig)
         else:
             input_psf = "step3_input_orig.psf"
-            print("Reading PSF file from backup")
+            logging.info("Reading PSF file from backup")
 
         ## Load parameter into ParmEd
         # PARAMETERS ARE LOADED DUE TO A BUG IN PARMED*
@@ -504,7 +498,7 @@ bomlev 0
         for atom in psf:
             if atom.name.startswith("H") and atom.residue.name != "TIP3":
                 assert atom.mass > 1.5
-        print("Successfully applied HMR")
+        logging.info("Successfully applied HMR")
 
 
 
@@ -542,7 +536,7 @@ bomlev 0
                 if dt != 0.001:
                     self._apply_constraints(fout.name)
 
-                print(f"Created YAML file {self.parent_dir}/config/{self.ligand_id}_{resname.lower()}.yaml for ASFE simulations using Transformato")
+                logging.info(f"Created YAML file {self.parent_dir}/config/{self.ligand_id}_{resname.lower()}.yaml for ASFE simulations using Transformato")
                 
     def _apply_constraints(self, fout):
         with open(fout, "r") as file:
