@@ -42,15 +42,15 @@ The CLI intends to keep up with developments in the Python backend, but may not 
 
 #### Usage:
 
-A main purpose for the CLI frontend is to give quick access to rerunning particular steps of the CHARMM-GUI-derived CHARMM input scripts, or all of them consecutively. The CLI also gives access to the main run types of the Python backend. The menus function by single-key selections and their operation should be fairly self-explanatory to anyone familiar with the CHARMM-GUI input scripts and the function of each step.
+A main purpose for the CLI frontend is to give quick access to rerunning particular steps of the CHARMM-GUI-derived CHARMM input scripts, or all of them consecutively. The CLI also gives access to the main run types of the Python backend. The menus function by single-key selections and their operation should be fairly self-explanatory. 
 
-Issue `macha` in the working directory of choice. This directory should contain the CHARMM-GUI input scripts. Python3 needs to be in the $PATH or available through an active conda environment.
+Having set an alias as suggested above, issue `macha` in the working directory of choice. This directory should contain the CHARMM-GUI input scripts. Python3 needs to be in the $PATH or available through an active conda environment.
 
 ##### System creation for transformato
-Call macha in the working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing main.py. More advanced options, such as a segment ID filter to allow production of multimeric complexes, are exposed in `main.py` and 
-users with less typical use cases/input structures are encouraged to explore these. Proper documentation may follow at some point - for now, users are referred to perusing the source code (mostly found in `functions.py`)
+Call `macha` in the working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing `main.py`. More advanced options, such as a segment ID filter to allow production of multimeric complexes, are exposed in `main.py` and 
+users with less typical use cases/input structures are encouraged to explore these. Proper documentation may follow at some point - for now, users are referred to the source code (found in `functions.py` and in 'charmm_factory.py`)
 
-The submenu "System creation for transformato" is accessed by clicking "t". Here, five run types are exposed (the corresponding direct Python call is show in parentheses); 
+The submenu "System creation for transformato" is accessed by clicking "t". Here, five run types are exposed (the corresponding direct Python calls are shown in parentheses); 
 - Make water boxes/complexes from ligands/proteins/complexes (`python3 main.py`)
 - Make complexes (no water boxes) from ligands/proteins/complexes (`python3 main.py --nowaterbox`)
 - Make water boxes (no complexes) from ligands/complexes (`python3 main.py --nocomplex`)
