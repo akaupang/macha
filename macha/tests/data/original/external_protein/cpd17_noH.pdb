@@ -1,0 +1,102 @@
+TITLE     cpd11
+REMARK   4      COMPLIES WITH FORMAT V. 3.0, 1-DEC-2006
+REMARK 888
+REMARK 888 WRITTEN BY MAESTRO (A PRODUCT OF SCHRODINGER, LLC)
+HETATM    1 Cl1  DY6 A 478      -3.597 -14.655  51.358  1.00 48.01          Cl  
+HETATM    2  N1  DY6 A 478       4.082  -6.132  53.964  1.00 50.77           N  
+HETATM    3  S2  DY6 A 478       3.740  -6.464  55.612  1.00 50.99           S  
+HETATM    4  C3  DY6 A 478       4.902  -7.185  53.326  1.00 50.88           C  
+HETATM    5  C4  DY6 A 478       4.391  -4.703  53.654  1.00 50.19           C  
+HETATM    6  C5  DY6 A 478       2.027  -6.763  55.224  1.00 51.19           C  
+HETATM    7  O6  DY6 A 478       3.854  -5.288  56.465  1.00 50.24           O  
+HETATM    8  O7  DY6 A 478       4.309  -7.735  56.010  1.00 51.48           O  
+HETATM    9  C8  DY6 A 478       5.387  -6.812  51.978  1.00 51.15           C  
+HETATM   10  C9  DY6 A 478       5.568  -4.442  52.741  1.00 50.38           C  
+HETATM   11  C10 DY6 A 478       1.599  -8.044  54.942  1.00 51.05           C  
+HETATM   12  C11 DY6 A 478       1.167  -5.686  55.184  1.00 51.51           C  
+HETATM   13  C12 DY6 A 478       5.704  -5.500  51.701  1.00 51.03           C  
+HETATM   14  C13 DY6 A 478       5.519  -7.784  51.015  1.00 51.11           C  
+HETATM   15  C14 DY6 A 478       0.266  -8.233  54.633  1.00 50.65           C  
+HETATM   16  C15 DY6 A 478      -0.158  -5.895  54.867  1.00 51.58           C  
+HETATM   17  C16 DY6 A 478       6.159  -5.159  50.448  1.00 51.38           C  
+HETATM   18  C17 DY6 A 478       5.977  -7.435  49.766  1.00 51.50           C  
+HETATM   19  C18 DY6 A 478      -0.242  -9.580  54.340  1.00 50.89           C  
+HETATM   20  C19 DY6 A 478      -0.608  -7.171  54.596  1.00 51.10           C  
+HETATM   21  C20 DY6 A 478       6.298  -6.125  49.481  1.00 51.36           C  
+HETATM   22  N21 DY6 A 478      -1.126  -9.626  53.293  1.00 49.80           N  
+HETATM   23  O22 DY6 A 478       0.123 -10.538  55.010  1.00 52.34           O  
+HETATM   24  C23 DY6 A 478      -1.707 -10.832  52.840  1.00 48.92           C  
+HETATM   25  C24 DY6 A 478      -2.727 -10.786  51.913  1.00 48.29           C  
+HETATM   26  C25 DY6 A 478      -1.263 -12.047  53.313  1.00 47.43           C  
+HETATM   27  C26 DY6 A 478      -3.303 -11.946  51.458  1.00 47.53           C  
+HETATM   28  C27 DY6 A 478      -3.222  -9.510  51.392  1.00 48.72           C  
+HETATM   29  C28 DY6 A 478      -1.842 -13.206  52.861  1.00 47.53           C  
+HETATM   30  C29 DY6 A 478      -2.858 -13.155  51.936  1.00 48.01           C  
+HETATM   31  O30 DY6 A 478      -3.042  -8.489  52.103  1.00 48.57           O1-
+HETATM   32  O31 DY6 A 478      -3.793  -9.558  50.270  1.00 51.43           O  
+HETATM   33 Cl2  DY6 A 478       6.153  -8.669  48.524  1.00 51.50          Cl  
+CONECT   34   17
+CONECT    1   30
+CONECT    2    3    4    5
+CONECT    3    2    6    7    8
+CONECT    4    2   35   36    9
+CONECT    5    2   37   38   10
+CONECT    6    3   11   12
+CONECT    6   11
+CONECT    7    3
+CONECT    8    3
+CONECT    9    4   13   14
+CONECT   10    5   39   40   13
+CONECT   11    6   41   15
+CONECT   11    6
+CONECT   12    6   42   16
+CONECT   12   16
+CONECT   13    9   10   17
+CONECT   14    9   43   18
+CONECT   15   11   19   20
+CONECT   15   20
+CONECT   16   12   44   20
+CONECT   16   12
+CONECT   17   34   13   21
+CONECT   18   14   33   21
+CONECT   19   15   22   23
+CONECT   20   15   16   45
+CONECT   20   15
+CONECT   21   17   18   46
+CONECT   22   19   47   24
+CONECT   23   19
+CONECT   24   22   25   26
+CONECT   24   25
+CONECT   25   24   27   28
+CONECT   25   24
+CONECT   26   24   48   29
+CONECT   26   29
+CONECT   27   25   49   30
+CONECT   27   30
+CONECT   28   25   31   32
+CONECT   28   32
+CONECT   29   26   50   30
+CONECT   29   26
+CONECT   30    1   27   29
+CONECT   30   27
+CONECT   31   28
+CONECT   32   28
+CONECT   32   28
+CONECT   35    4
+CONECT   36    4
+CONECT   37    5
+CONECT   38    5
+CONECT   39   10
+CONECT   40   10
+CONECT   41   11
+CONECT   42   12
+CONECT   43   14
+CONECT   44   16
+CONECT   33   18
+CONECT   45   20
+CONECT   46   21
+CONECT   47   22
+CONECT   48   26
+CONECT   49   27
+CONECT   50   29
+END   

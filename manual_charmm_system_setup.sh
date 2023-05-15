@@ -70,10 +70,11 @@ run_t_submenu () {
   echo "--------------------------------------------------------------------------------"
   echo "Key"
   echo " 1 : Copy main.py from package and set path to cgenff"
-  echo " 2 : Run system creation - proteins and ligands"
-  echo " 3 : Run system creation - RNA"
-  echo " 4 : Run system creation - only water boxes"
-  echo " 5 : Run system creation - only complexes"
+  echo " 2 : Make water boxes/complexes from ligands/proteins/complexes"
+  echo " 3 : Make complexes (no water boxes) from ligands/proteins/complexes"
+  echo " 4 : Make water boxes (no complexes) from ligands/complexes"
+  echo " 5 : Make water boxes/complexes from double-stranded RNA"
+  echo " 6 : Make water boxes (no complexes) from double- or single-stranded RNA"
   echo ""
   echo " r : Return to main menu"
   echo " q : Quit"
@@ -147,7 +148,7 @@ run_t_submenu () {
   elif [ "$submenuoption" = "3" ]; then
     echo ""
     # Run backend
-    python3 main.py -rna
+    python3 main.py -nw
     
     # Return to systems creation submenu
     run_t_submenu
@@ -163,7 +164,15 @@ run_t_submenu () {
   elif [ "$submenuoption" = "5" ]; then
     echo ""
     # Run backend
-    python3 main.py -nw
+    python3 main.py -rna
+    
+    # Return to systems creation submenu
+    run_t_submenu
+
+  elif [ "$submenuoption" = "6" ]; then
+    echo ""
+    # Run backend
+    python3 main.py -rna -nc
     
     # Return to systems creation submenu
     run_t_submenu

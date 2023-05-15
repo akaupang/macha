@@ -96,7 +96,7 @@ if ((cgenff_path == "") and (rna == False)):
     logging.error(f"This package requires cgenff for parameterization.")
     logging.error(f"Please install it in the active environment or point the routine")
     logging.error(f"to the right path using the key cgenff_path='/path/to/cgenff' .")
-    logging.error(f"")  
+    logging.error(f"")
     sys.exit(1)
 
 # Check for protein.pdb and if none is found, assume complexes are provided.
