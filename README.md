@@ -20,6 +20,7 @@ macha is also available as a conda package and can be installed in any conda env
 
 `conda install -c johanneskarwou -c conda-forge macha`
 
+In your python environment, you will also need the packages; `parmed openbabel natsort`.
 <!-- TODO: Update the conda package. Add packages parmed, openbabel, natsort to conda package requirements. -->
 
 ##### Post-installation setup
