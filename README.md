@@ -47,7 +47,7 @@ A main purpose for the CLI frontend is to give quick access to rerunning particu
 Having set an alias as suggested above, issue `macha` in the working directory of choice. This directory should contain the CHARMM-GUI input scripts. Python3 needs to be in the $PATH or available through an active conda environment.
 
 ##### System creation for transformato
-Call `macha` in the working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing `main.py`. More advanced options, such as a segment ID filter to allow production of multimeric complexes, are exposed in `main.py` and 
+Call `macha` in the working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing [main.py](https://github.com/akaupang/macha/blob/main/macha/main.py). More advanced options, such as a segment ID filter to allow production of multimeric complexes, are exposed in `main.py` and 
 users with less typical use cases/input structures are encouraged to explore these. Proper documentation may follow at some point - for now, users are referred to the source code (found in `functions.py` and in 'charmm_factory.py`)
 
 The submenu "System creation for transformato" is accessed by clicking "t". Here, five run types are exposed (the corresponding direct Python calls are shown in parentheses); 
