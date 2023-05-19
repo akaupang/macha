@@ -8,7 +8,7 @@
 #### Description
 macha is a meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend. 
 
-Typical use cases include rerunning CHARMM-GUI scripts[[1]](https://charmm-gui.org/) locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with transformato[[2]](https://github.com/wiederm/transformato)), starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
+Typical use cases include rerunning CHARMM-GUI scripts[^1](https://charmm-gui.org/) locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with transformato[[2]](https://github.com/wiederm/transformato)), starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
 
 macha relies on CHARMM-GUI input scripts[[1]](https://charmm-gui.org/) for CHARMM[[3]](https://academiccharmm.org/), as well as on ParmEd [[4]](https://github.com/ParmEd/ParmEd) and OpenBabel [[5]](https://github.com/openbabel/openbabel). Please, see the references at the bottom.
 
@@ -67,7 +67,7 @@ One may then select the run type of choice by clicking a number from 2 - 6 (if u
 
 
 #### References
-[1] Jo, S.; Kim, T.; Iyer, V. G.; Im, W. CHARMM-GUI: A Web-Based Graphical User Interface for CHARMM. Journal of Computational Chemistry 2008, 29 (11), 1859–1865. https://doi.org/10.1002/jcc.20945.
+[^1]: Jo, S.; Kim, T.; Iyer, V. G.; Im, W. CHARMM-GUI: A Web-Based Graphical User Interface for CHARMM. Journal of Computational Chemistry 2008, 29 (11), 1859–1865. https://doi.org/10.1002/jcc.20945.
 
 [2] Wieder, M.; Fleck, M.; Braunsfeld, B.; Boresch, S. Alchemical Free Energy Simulations without Speed Limits. A Generic Framework to Calculate Free Energy Differences Independent of the Underlying Molecular Dynamics Program. Journal of Computational Chemistry 2022, 43 (17), 1151–1160. https://doi.org/10.1002/jcc.26877.
 
