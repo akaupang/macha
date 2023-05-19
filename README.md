@@ -20,7 +20,7 @@ macha can be obtained by cloning this repository, issuing:
 
 macha is also available as a conda package and can be installed in any conda environment with:
 
-`conda install -c johanneskarwou -c conda-forge macha`
+`conda install -c conda-forge macha`
 
 In your python environment, you will also need the packages; `parmed openbabel natsort`.
 <!-- TODO: Update the conda package. Add packages parmed, openbabel, natsort to conda package requirements. -->
