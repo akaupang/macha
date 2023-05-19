@@ -18,12 +18,11 @@ macha can be obtained by cloning this repository, issuing:
 
 `git clone git@github.com:akaupang/macha.git`
 
-macha is also available as a conda package and can be installed in any conda environment with:
+macha will soon be available as a conda package and can be installed in a conda environment with:
 
 `conda install -c conda-forge macha`
 
-In your python environment, you will also need the packages; `parmed openbabel natsort`.
-<!-- TODO: Update the conda package. Add packages parmed, openbabel, natsort to conda package requirements. -->
+In your python environment, you will also need the packages parmed, openbabel and [natsort](https://github.com/SethMMorton/natsort).
 
 ##### Post-installation setup
 After installation, the user must set the path to a local `cgenff` binary in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
