@@ -8,7 +8,7 @@
 #### Description
 macha is a meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend. 
 
-Typical use cases include rerunning CHARMM-GUI scripts[^1] locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with `transformato`[^2], starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
+Typical use cases include rerunning CHARMM-GUI scripts[^1] locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with ***transformato***[^2], starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
 
 macha relies on CHARMM-GUI input scripts[^1] for CHARMM[^3], as well as on ParmEd[^4] and OpenBabel[^5]. Please, see the references at the bottom.
 
