@@ -8,9 +8,9 @@
 #### Description
 macha is a meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend. 
 
-Typical use cases include rerunning CHARMM-GUI scripts[[1]](https://charmm-gui.org/) locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with transformato[[1]](https://github.com/wiederm/transformato)), starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
+Typical use cases include rerunning CHARMM-GUI scripts[[1]](https://charmm-gui.org/) locally (after edits or changes) and setting up water boxes and complexes e.g. for further setup of free energy calculations with transformato[[2]](https://github.com/wiederm/transformato)), starting from PDB files of separate proteins and/or ligands and/or complexes, e.g. from protein data banks such as the [PDBe](https://www.ebi.ac.uk/pdbe/) or the [RCSB PDB](https://www.rcsb.org/). 
 
-macha relies on CHARMM-GUI input scripts[[2]](https://charmm-gui.org/) for CHARMM[[3]](https://academiccharmm.org/), as well as on ParmEd [[4]](https://github.com/ParmEd/ParmEd) and OpenBabel [[5]](https://github.com/openbabel/openbabel). Please, see the references at the bottom.
+macha relies on CHARMM-GUI input scripts[[1]](https://charmm-gui.org/) for CHARMM[[3]](https://academiccharmm.org/), as well as on ParmEd [[4]](https://github.com/ParmEd/ParmEd) and OpenBabel [[5]](https://github.com/openbabel/openbabel). Please, see the references at the bottom.
 
 #### Installation
 
@@ -67,12 +67,16 @@ One may then select the run type of choice by clicking a number from 2 - 6 (if u
 
 
 #### References
-[1] Wieder, M.; Fleck, M.; Braunsfeld, B.; Boresch, S. Alchemical Free Energy Simulations without Speed Limits. A Generic Framework to Calculate Free Energy Differences Independent of the Underlying Molecular Dynamics Program. Journal of Computational Chemistry 2022, 43 (17), 1151–1160. https://doi.org/10.1002/jcc.26877.
+[1] Jo, S.; Kim, T.; Iyer, V. G.; Im, W. CHARMM-GUI: A Web-Based Graphical User Interface for CHARMM. Journal of Computational Chemistry 2008, 29 (11), 1859–1865. https://doi.org/10.1002/jcc.20945.
+
+[2] Wieder, M.; Fleck, M.; Braunsfeld, B.; Boresch, S. Alchemical Free Energy Simulations without Speed Limits. A Generic Framework to Calculate Free Energy Differences Independent of the Underlying Molecular Dynamics Program. Journal of Computational Chemistry 2022, 43 (17), 1151–1160. https://doi.org/10.1002/jcc.26877.
+
   Karwounopoulos, J.; Wieder, M.; Boresch, S. Relative Binding Free Energy Calculations with Transformato: A Molecular Dynamics Engine-Independent Tool. Front. Mol. Biosci. 2022, 9, 954638. https://doi.org/10.3389/fmolb.2022.954638.
 
-[2] Jo, S.; Kim, T.; Iyer, V. G.; Im, W. CHARMM-GUI: A Web-Based Graphical User Interface for CHARMM. Journal of Computational Chemistry 2008, 29 (11), 1859–1865. https://doi.org/10.1002/jcc.20945.
 [3] Brooks, B. R.; Bruccoleri, R. E.; Olafson, B. D.; States, D. J.; Swaminathan, S.; Karplus, M. CHARMM: A Program for Macromolecular Energy, Minimization, and Dynamics Calculations. J. Comput. Chem. 1983, 4 (2), 187–217. https://doi.org/10.1002/jcc.540040211.
+
 [4] Shirts, M. R.; Klein, C.; Swails, J. M.; Yin, J.; Gilson, M. K.; Mobley, D. L.; Case, D. A.; Zhong, E. D. Lessons Learned from Comparing Molecular Dynamics Engines on the SAMPL5 Dataset. Journal of Computer-Aided Molecular Design 2017, 31 (1), 147–161. https://doi.org/10.1007/s10822-016-9977-1.
+
 [5] O’Boyle, N. M.; Banck, M.; James, C. A.; Morley, C.; Vandermeersch, T.; Hutchison, G. R. Open Babel: An Open Chemical Toolbox. Journal of Cheminformatics 2011, 3 (1), 33. https://doi.org/10.1186/1758-2946-3-33.
 
 
