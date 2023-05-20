@@ -10,7 +10,7 @@ macha_py_base="/path/to/macha/macha"
 cgenff_bin="/path/to/cgenff_bin"
 
 # Charmm binary # Leave empty if the system-wide charmm is to be used
-charmm_bin_man="/home/manny/charmm/bin/charmm"
+charmm_bin_man="/path/to/charmm_bin"
 
 # Location of CHARMM-GUI-provided OpenMM Python scripts
 # Default is the directory created upon creation of a modified OpenMM system,
