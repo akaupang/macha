@@ -3,12 +3,11 @@
 ###############################################################################
 
 # SYSTEM VARIABLES
-# Macha python backend base folder # /path/to/macha/macha
-macha_py_base="/home/manny/Documents/Work/UiO/Modeling/wien/scripts/bash/macha/macha"
+# Macha python backend base folder
+macha_py_base="/path/to/macha/macha"
 
 # cgenff binary location
-cgenff_bin="/home/manny/Documents/Work/UiO/Modeling/wien/ligands/silcsbio/silcsbio.2022.1/cgenff/cgenff"
-#cgenff_bin=""
+cgenff_bin="/path/to/cgenff_bin"
 
 # Charmm binary # Leave empty if the system-wide charmm is to be used
 charmm_bin_man="/home/manny/charmm/bin/charmm"
