@@ -376,13 +376,15 @@ run_a_submenu () {
 runmenu () {
   echo ""
   echo "--------------------------------------------------------------------------------"
-  echo "Manual Launch Control for CHARMM-GUI Scripts"
+  echo " Main Menu
   echo "--------------------------------------------------------------------------------"
   echo "Key"
+  echo "     Submenus"
   echo " a : Advanced pre-/post-run options"
   echo " t : System creation for transformato"
   echo ""
-  echo " 1 : Step 1   PDB Reader (modified)"
+  echo "     Manual Launch Control for CHARMM-GUI Scripts"
+  echo " 1 : Step 1   PDB Reader"
   echo " 2 : Step 2.1 Waterbox"
   echo " 3 : Step 2.2 Ions"
   echo " 4 : Step 2   Solvator"
