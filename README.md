@@ -14,15 +14,20 @@ macha relies on CHARMM-GUI input scripts[^1] for CHARMM[^4], as well as on ParmE
 
 #### Installation
 
-macha can be obtained by cloning this repository, issuing: 
-
-`git clone git@github.com:akaupang/macha.git`
-
-macha will soon be available as a conda package and can be installed in a conda environment with:
+###### Alternative A
+The python backend of macha is available as a conda package and can be installed (together with its dependencies) in a conda environment with:
 
 `conda install -c conda-forge macha`
 
-In your python environment, you will also need the packages parmed, openbabel and [natsort](https://github.com/SethMMorton/natsort).
+If desirable, the CLI interface bash script `manual_charmm_system_setup.sh` can subsequently be downloaded from the [macha GitHub repository](https://github.com/akaupang/macha).
+
+###### Alternative B
+
+A full copy of macha can be obtained by cloning this repository with; 
+
+`git clone git@github.com:akaupang/macha.git`
+
+Subsequently, it can be installed in an active python environment (e.g. a conda environment) by issuing `pip install .` in the git package base directory. The python environment should also contain the packages parmed, openbabel and [natsort](https://github.com/SethMMorton/natsort).
 
 ##### Post-installation setup
 After installation, the user must set the path to a local `cgenff` binary in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
