@@ -2,9 +2,8 @@
 [![GitHub Actions Build Status](https://github.com/akaupang/macha/workflows/CI/badge.svg)](https://github.com/akaupang/macha/actions)
 [![codecov](https://codecov.io/gh/akuapang/macha/branch/main/graph/badge.svg)](https://codecov.io/gh/akaupang/macha/branch/main)
 
-
-## macha 
-### (maNUAL chaRMM)
+## 
+##  macha <br><sup><sup><sub>( maNUAL chaRMM )</sup></sub></sup>
 
 #### Description
 macha is a meta-tool designed to (semi-)automate certain tasks related to setting up MD simulation systems. It is divided into a CLI front-end, written in bash, and a backend written in Python. The latter is accessible either directly or through the CLI frontend. 
