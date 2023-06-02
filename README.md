@@ -30,9 +30,9 @@ A full copy of macha can be obtained by cloning this repository with;
 Subsequently, it can be installed in an active python environment (e.g. a conda environment) by issuing `pip install .` in the git package base directory. The python environment should also contain the packages [parmed](https://github.com/ParmEd/ParmEd), [openbabel](https://github.com/openbabel/openbabel) and [natsort](https://github.com/SethMMorton/natsort).
 
 ##### Post-installation setup
-After installation, the user must set the path to a local `cgenff` binary in `main.py` to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
+After installation, the user must set the path to a local `cgenff` binary in `main.py` (see also Usage) to be able to use CGenFF parameterization of ligands (not required for single- or double-stranded RNA, which are natively parameterized in CHARMM).
 
-For the CLI to work, a few variables should be set at the top of `manual_charmm_system_setup.sh`. The `macha_py_base` *must* point to the base directory of the python backend for this to be usable. If not set in the package version of `main.py`, the path to `cgenff` can be set here using the variable `cgenff_bin`. A user can also choose to set the variable `charmm_bin_man`, if a particular CHARMM binary should be used (by default, `charmm` is assumed to be in the $PATH). 
+For the CLI to work, a few variables should be set at the top of `manual_charmm_system_setup.sh`. The `macha_py_base` *must* point to the base directory of the python backend for this to be usable, typically `~/miniconda3/envs/macha/lib/python3.11/site-packages/macha/main.py`, if using the conda package. If not set in the package version of `main.py`, the path to `cgenff` can be set here using the variable `cgenff_bin`. A user can also choose to set the variable `charmm_bin_man`, if a particular CHARMM binary should be used (by default, `charmm` is assumed to be in the $PATH). 
 
 For convenient usage of the CLI frontend, we recommend setting an alias in your `~/.bashrc` to `macha`, like so:
 
@@ -53,8 +53,10 @@ A main purpose for the CLI frontend is to give quick access to rerunning particu
 
 Having set an alias as suggested above, issue `macha` in the working directory of choice. This directory should contain the CHARMM-GUI input scripts. Python3 needs to be in the $PATH or available through an active conda environment.
 
-##### System creation for transformato
-Call `macha` in the working directory of choice. This directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing `main.py`. More advanced options, such as a segment ID filter to allow production of multimeric complexes and adjustable system pH for addition of hydrogens, are exposed in `main.py` and users with less typical use cases/input structures are encouraged to explore these. Proper documentation may follow at some point. For now, advanced users are referred to the source code (found in `functions.py` and in `charmm_factory.py`)
+##### System creation for transformato (via the CLI or via direct Python calls)
+If you want to perform direct Python calls, copy `main.py` from its package location `/path/to/macha/main.py` (if the git repo was cloned), to the working directory. The working directory must contain a subdirectory called "data", which in turn contains a subdirectory called "original", in which PDB files of ligands, complexes or RNA should reside. These directory names can be changed by editing `main.py`. More advanced options, such as a segment ID filter to allow production of multimeric complexes and adjustable system pH for addition of hydrogens, are exposed in `main.py` and users with less typical use cases/input structures are encouraged to explore these. Proper documentation may follow at some point. For now, advanced users are referred to the source code (found in `functions.py` and in `charmm_factory.py`)
+
+Call `macha` in the working directory of choice, if you are using the CLI.
 
 The submenu "System creation for transformato" is accessed by clicking "t". Here, five run types are exposed (the corresponding direct Python calls are shown in parentheses); 
 - Make water boxes/complexes from ligands/proteins/complexes (`python3 main.py`)
@@ -63,7 +65,7 @@ The submenu "System creation for transformato" is accessed by clicking "t". Here
 - Make water boxes/complexes from double-stranded RNA (`python3 main.py --rna`)
 - Make water boxes (no complexes) from double- or single-stranded RNA (`python3 main.py --rna --nocomplex`)
 
-Before running system creation, the `main.py` script must be copied to the working directory. This is done by choosing menu option "1" in the system creation for transformato submenu (*note that this overwrites any existing local copy*). This will also copy the path to the local cgenff binary to this local copy of `main.py`, if the variable `cgenff_bin` has been set at the top of the bash script `manual_charmm_system_setup.sh`, AND if the `cgenff_path` in `main.py` has not been set in the package version of this file `../macha/macha/main.py`.
+If you are using the CLI, before running system creation, the `main.py` script must be copied to the working directory. This is done by choosing menu option "1" in the system creation for transformato submenu (*note that this overwrites any existing local copy*). This will also copy the path to the local cgenff binary to this local copy of `main.py`, if the variable `cgenff_bin` has been set at the top of the bash script `manual_charmm_system_setup.sh`, AND if the `cgenff_path` in `main.py` has not been set in the package version of this file `../macha/macha/main.py`.
 
 One may then select the run type of choice by clicking a number from 2 - 6 (if using the CLI).
 
