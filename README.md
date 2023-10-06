@@ -2,7 +2,6 @@
 [![GitHub Actions Build Status](https://github.com/akaupang/macha/workflows/CI/badge.svg)](https://github.com/akaupang/macha/actions)
 [![codecov](https://codecov.io/gh/akuapang/macha/branch/main/graph/badge.svg)](https://codecov.io/gh/akaupang/macha/branch/main)
 
-## 
 
 <p align="center">
   <img src="https://github.com/akaupang/macha/assets/72743318/3b42c494-2f01-422d-9470-d98fbc22de5e" width=20% height=20%>
